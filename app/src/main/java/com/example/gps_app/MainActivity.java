@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
@@ -28,16 +29,33 @@ import com.google.android.gms.location.LocationServices;
 
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
+import org.osmdroid.config.IConfigurationProvider;
 import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapController;
+import org.osmdroid.views.overlay.Marker;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.xmlpull.v1.XmlSerializer;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.TimeZone;
 
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.views.MapView;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -51,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
     FileOutputStream fos;
     XmlSerializer serializer;
 
+//    FileInputStream fis;
+//    InputStreamReader isr;
 
     MapView map = null;
 
@@ -58,15 +78,32 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        //load/initialize the osmdroid configuration, this can be done
-        //setting this before the layout is inflated is a good idea
-        //it 'should' ensure that the map has a writable location for the map cache, even without permissions
-        //if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
-        //see also StorageUtils
-        //note, the load method also sets the HTTP User Agent to your application's package name, abusing osm's tile servers will get you banned based on this string
+//        load/initialize the osmdroid configuration, this can be done
+//        setting this before the layout is inflated is a good idea
+//        it 'should' ensure that the map has a writable location for the map cache, even without permissions
+//        if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
+//        see also StorageUtils
+//        note, the load method also sets the HTTP User Agent to your application's package name, abusing osm's tile servers will get you banned based on this string
         Context ctx = getApplicationContext();
         Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
 
+//        File basePath = new File(getFilesDir().getAbsolutePath()+"/osmdroid");
+//        Configuration.getInstance().setOsmdroidBasePath(basePath);
+//        File tileCache = new File(getFilesDir().getAbsolutePath()+"/osmdroid/tiles");
+//        Configuration.getInstance().setOsmdroidTileCache(tileCache);
+//        Configuration.getInstance().setCacheSizes(...)
+//        Configuration.getInstance().setOfflineMapsPath(this.getFilesDir().getAbsolutePath());
+//        Configuration.getInstance().setUserAgentValue(...)
+
+
+
+//        IConfigurationProvider osmConf = Configuration
+        org.osmdroid.config.IConfigurationProvider osmConf = org.osmdroid.config.Configuration.getInstance();
+        File basePath = new File(getFilesDir().getAbsolutePath()+"/osmdroid");
+        osmConf.setOsmdroidBasePath(basePath);
+        File tileCache = new File(getFilesDir().getAbsolutePath()+"/osmdroid/tiles");
+        osmConf.setOsmdroidTileCache(tileCache);
+//        Log.d("osm",Configuration.getIns)
 
         setContentView(R.layout.activity_main);
 
@@ -78,16 +115,68 @@ public class MainActivity extends AppCompatActivity {
         map = (MapView) findViewById(R.id.map);
         map.setTileSource(TileSourceFactory.MAPNIK);
 
-        map.setMultiTouchControls(true);
 
         IMapController mapController = map.getController();
-        mapController.setZoom(9.5);
+        mapController.setZoom(18.0);
+
+
+        //Parsing XML for display
+//        String filename = "Rec1.gpx";
+//        fis = this.getApplicationContext().openFileInput(filename);
+//        isr = new InputStreamReader(fis);
+//
+//        char[] inputBuffer = new char[fis.available()];
+//        isr.read(inputBuffer);
+//
+//        String data = new String(inputBuffer);
+//
+//        isr.close();
+//        fis.close();
+//
+//        InputStream is = new ByteArrayInputStream(data.getBytes("UTF-8"));
+//        ArrayList<XmlData> xmlDataList = new ArrayList<XmlData>();
+//
+//        XmlData xmlDataObj;
+//        DocumentBuilderFactory dbf;
+//        DocumentBuilder db;
+//        NodeList items = null;
+//        Document dom;
+//
+//        dbf = DocumentBuilderFactory.newInstance();
+//        db = dbf.newDocumentBuilder();
+//        dom = db.parse(is);
+//
+//        // Normalize the document
+//        dom.getDocumentElement().normalize();
+//
+//        items = dom.getElementsByTagName("record");
+//        ArrayList<String> arr = new ArrayList<String>();
+//
+//        for (int i = 0; i < items.getLength(); i++)
+//        {
+//            Node item = items.item(i);
+//            arr.add(item.getNodeValue());
+//        }
+
+
+
+
         GeoPoint startPoint = new GeoPoint(10.0251, 76.3459);
         mapController.setCenter(startPoint);
+//        map.getController().animateTo(startPoint);
+
+        Marker marker = new Marker(map);
+        marker.setPosition(startPoint);
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        map.getOverlays().add(marker);
+        marker.setIcon(this.getDrawable(R.drawable.center));
+        map.invalidate();
+
 
         start_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                Log.d("oss",getFilesDir().getAbsolutePath());
                 if (checkPermissions()){
                     if (isLocationEnabled()){
                         //New XML
@@ -162,7 +251,11 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onLocationResult(LocationResult locationResult) {
             Location mLastLocation = locationResult.getLastLocation();
-            String text_disp = Instant.now() + " Latitude"+Double.toString(mLastLocation.getLatitude()) + "Longitude" + Double.toString(mLastLocation.getLongitude());
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            String text_disp = sdf.format(System.currentTimeMillis()) + " Latitude"+Double.toString(mLastLocation.getLatitude()) + "Longitude" + Double.toString(mLastLocation.getLongitude());
             mlocation.setText(text_disp);
             //Write to XML
 
@@ -176,7 +269,10 @@ public class MainActivity extends AppCompatActivity {
                 serializer.endTag(null,"ele");
 
                 serializer.startTag(null,"time");
-                String time = String.valueOf(Instant.now());
+
+                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                String time = sdf.format(System.currentTimeMillis());
+
                 serializer.text(time);
                 serializer.endTag(null,"time");
 
