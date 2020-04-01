@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
@@ -36,6 +37,7 @@ import org.osmdroid.views.overlay.Marker;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -47,9 +49,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Timer;
@@ -78,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
     XmlPullParserFactory factory;
     XmlPullParser gpx_parser;
 
+    long prev_time;
 
 
     MapView map = null;
@@ -89,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
 
     Boolean play;
 
+    long current_delay = 500;
 
 
     @Override
@@ -195,6 +201,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else{
                     requestPermissions();
+                    if (!isLocationEnabled()){
+                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                        startActivity(intent);
+                    }
                 }
             }
         });
@@ -216,32 +226,35 @@ public class MainActivity extends AppCompatActivity {
     private void open_gpx_read(){
         String filename = "Rec1.gpx";
 
+        //Opening file and setting factory
         try {
             fis = new FileInputStream(new File(getFilesDir(), filename));
             factory = XmlPullParserFactory.newInstance();
             factory.setNamespaceAware(true);
         }
-        catch (Exception e){
+        catch (IOException | XmlPullParserException e){
             e.printStackTrace();
         }
 
 
+        //Linking input xml and parser
         try {
             gpx_parser = factory.newPullParser();
             gpx_parser.setInput(fis, null);
         }
-        catch (Exception e){
+        catch (XmlPullParserException e){
             e.printStackTrace();
         }
 
 
+        //Parsing till trkpt
         try {
             int eventType = gpx_parser.getEventType();
 
             while (true) {
 
-                if (eventType == XmlPullParser.START_TAG) {
-                    if (gpx_parser.getName().equals("trkseg")) {
+                if (eventType == XmlPullParser.START_TAG){
+                    if (gpx_parser.getName().equals("trkseg")){
                         gpx_parser.next();
                         gpx_parser.next();
                         break;
@@ -260,12 +273,36 @@ public class MainActivity extends AppCompatActivity {
             }
 
         }
-        catch (Exception e){
+        catch (IOException | XmlPullParserException e){
             e.printStackTrace();
         }
+
     }
 
 
+    //Update map with current value
+    private void update_map(){
+        GeoPoint startPoint = get_next_location();
+        if (startPoint==null){
+            stop_gps_playback();
+            return;
+        }
+        mapController.setCenter(startPoint);
+
+        if (prev_marker!=null){
+            map.getOverlays().remove(prev_marker);
+        }
+        Marker marker = new Marker(map);
+        marker.setPosition(startPoint);
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        map.getOverlays().add(marker);
+        marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
+        prev_marker = marker;
+        map.invalidate();
+    }
+
+
+    //Start playback for click updation--- every click map updates
     private void start_gps_playback(){
 
         if(gpx_parser==null){
@@ -274,29 +311,29 @@ public class MainActivity extends AppCompatActivity {
 
         play = true;
 
-        if(play){
+        //
+        update_map();
+        update_map();
 
-            GeoPoint startPoint = get_next_location();
-            if (startPoint==null){
-                stop_gps_playback();
-                return;
+        final Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if(play){
+                    update_map();
+                    handler.postDelayed(this,current_delay);
+                }
+                else{
+                    handler.removeCallbacks(this);
+                }
             }
-            mapController.setCenter(startPoint);
+        }, current_delay);
 
-            if (prev_marker!=null){
-                map.getOverlays().remove(prev_marker);
-            }
-            Marker marker = new Marker(map);
-            marker.setPosition(startPoint);
-            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            map.getOverlays().add(marker);
-            marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
-            prev_marker = marker;
-            map.invalidate();
-        }
     }
 
+
     private void stop_gps_playback(){
+
         play = false;
         gpx_parser = null;
         factory = null;
@@ -331,7 +368,13 @@ public class MainActivity extends AppCompatActivity {
             gpx_parser.next();
             gpx_parser.getName();//Time
             gpx_parser.next();
-            gpx_parser.getText();//Time value
+            //Updating time
+            long new_time = sdf.parse(gpx_parser.getText(),new ParsePosition(0)).getTime();
+            Log.d("time",Long.toString(new_time));
+            Log.d("time",Long.toString(prev_time));
+            current_delay =  new_time - prev_time; //Time value
+            prev_time = new_time;
+            Log.d("time",Long.toString(current_delay));
             gpx_parser.next();
             gpx_parser.getName();//Time close
             gpx_parser.next();
@@ -346,7 +389,8 @@ public class MainActivity extends AppCompatActivity {
             Log.d("ss", gpx_parser.getName());//new trkpt
 
         }
-        catch (Exception e){
+        catch (IOException | XmlPullParserException e){
+            Log.d("EXCEPRION","here");
             e.printStackTrace();
         }
         return startPoint;
