@@ -35,6 +35,8 @@ import org.osmdroid.views.MapController;
 import org.osmdroid.views.overlay.Marker;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlSerializer;
 
 import java.io.ByteArrayInputStream;
@@ -50,6 +52,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.views.MapView;
@@ -61,18 +65,31 @@ import javax.xml.parsers.DocumentBuilderFactory;
 public class MainActivity extends AppCompatActivity {
 
     int PERMISSION_ID = 44;
+    private int number = 0;
     FusedLocationProviderClient mFusedLocationClient;
 
-    Button start_button,stop_button;
+    Button start_button,stop_button,play_button,pause_button;
     TextView mlocation;
 
     FileOutputStream fos;
     XmlSerializer serializer;
 
-//    FileInputStream fis;
-//    InputStreamReader isr;
+    FileInputStream fis;
+    XmlPullParserFactory factory;
+    XmlPullParser gpx_parser;
+
+
 
     MapView map = null;
+    IMapController mapController;
+
+    Marker prev_marker = null;
+
+    SimpleDateFormat sdf;
+
+    Boolean play;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,132 +104,89 @@ public class MainActivity extends AppCompatActivity {
         Context ctx = getApplicationContext();
         Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
 
-//        File basePath = new File(getFilesDir().getAbsolutePath()+"/osmdroid");
-//        Configuration.getInstance().setOsmdroidBasePath(basePath);
-//        File tileCache = new File(getFilesDir().getAbsolutePath()+"/osmdroid/tiles");
-//        Configuration.getInstance().setOsmdroidTileCache(tileCache);
-//        Configuration.getInstance().setCacheSizes(...)
-//        Configuration.getInstance().setOfflineMapsPath(this.getFilesDir().getAbsolutePath());
-//        Configuration.getInstance().setUserAgentValue(...)
 
 
-
-//        IConfigurationProvider osmConf = Configuration
         org.osmdroid.config.IConfigurationProvider osmConf = org.osmdroid.config.Configuration.getInstance();
         File basePath = new File(getFilesDir().getAbsolutePath()+"/osmdroid");
         osmConf.setOsmdroidBasePath(basePath);
         File tileCache = new File(getFilesDir().getAbsolutePath()+"/osmdroid/tiles");
         osmConf.setOsmdroidTileCache(tileCache);
-//        Log.d("osm",Configuration.getIns)
 
         setContentView(R.layout.activity_main);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         start_button = (Button) findViewById(R.id.start_button);
         stop_button = (Button) findViewById(R.id.stop_button);
+        pause_button = (Button) findViewById(R.id.pause_button);
+        play_button = (Button) findViewById(R.id.play_button);
         mlocation = (TextView) findViewById(R.id.textView);
 
         map = (MapView) findViewById(R.id.map);
         map.setTileSource(TileSourceFactory.MAPNIK);
 
+        //Setting time format
+        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-        IMapController mapController = map.getController();
+        mapController = map.getController();
         mapController.setZoom(18.0);
 
 
-        //Parsing XML for display
-//        String filename = "Rec1.gpx";
-//        fis = this.getApplicationContext().openFileInput(filename);
-//        isr = new InputStreamReader(fis);
+//        Timer timer = new Timer();
+//        //Set the schedule function
+//        timer.scheduleAtFixedRate(new TimerTask() {
+//                                      @Override
+//                                      public void run() {
+//                                          // Magic here
+//                                          number = number + 1;
+//                                          runOnUiThread(new Runnable() {
+//                                              @Override
+//                                              public void run() {
+//                                                  GeoPoint startPoint = new GeoPoint(10.0251+number*0.0001, 76.3459);
+//                                                  mapController.setCenter(startPoint);
 //
-//        char[] inputBuffer = new char[fis.available()];
-//        isr.read(inputBuffer);
-//
-//        String data = new String(inputBuffer);
-//
-//        isr.close();
-//        fis.close();
-//
-//        InputStream is = new ByteArrayInputStream(data.getBytes("UTF-8"));
-//        ArrayList<XmlData> xmlDataList = new ArrayList<XmlData>();
-//
-//        XmlData xmlDataObj;
-//        DocumentBuilderFactory dbf;
-//        DocumentBuilder db;
-//        NodeList items = null;
-//        Document dom;
-//
-//        dbf = DocumentBuilderFactory.newInstance();
-//        db = dbf.newDocumentBuilder();
-//        dom = db.parse(is);
-//
-//        // Normalize the document
-//        dom.getDocumentElement().normalize();
-//
-//        items = dom.getElementsByTagName("record");
-//        ArrayList<String> arr = new ArrayList<String>();
-//
-//        for (int i = 0; i < items.getLength(); i++)
-//        {
-//            Node item = items.item(i);
-//            arr.add(item.getNodeValue());
-//        }
+//                                                  if (prev_marker!=null){
+//                                                      map.getOverlays().remove(prev_marker);
+//                                                  }
+//                                                  Marker marker = new Marker(map);
+//                                                  marker.setPosition(startPoint);
+//                                                  marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+//                                                  map.getOverlays().add(marker);
+//                                                  marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
+//                                                  prev_marker = marker;
+//                                                  map.invalidate();
+//                                              }
+//                                          });
+//                                      }
+//                                  },
+//                0, 3000);
 
 
+        play_button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                start_gps_playback();
+            }
+        });
 
 
-        GeoPoint startPoint = new GeoPoint(10.0251, 76.3459);
-        mapController.setCenter(startPoint);
-//        map.getController().animateTo(startPoint);
+        pause_button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                stop_gps_playback();
+            }
+        });
 
-        Marker marker = new Marker(map);
-        marker.setPosition(startPoint);
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-        map.getOverlays().add(marker);
-        marker.setIcon(this.getDrawable(R.drawable.center));
-        map.invalidate();
 
 
         start_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Log.d("oss",getFilesDir().getAbsolutePath());
                 if (checkPermissions()){
                     if (isLocationEnabled()){
                         //New XML
-                        //Dedide naming convention for filename
                         String filename = "Rec1.gpx";
-                        try {
-                            fos = openFileOutput(filename,Context.MODE_PRIVATE);
-                        } catch (FileNotFoundException e) {
-                            e.printStackTrace();
-                        }
-
-                        serializer = Xml.newSerializer();
-
-                        try {
-                            serializer.setOutput(fos, "UTF-8");
-                            serializer.startDocument(null, Boolean.valueOf(true));
-
-                            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
-
-                            serializer.startTag(null, "gpx");
-                            serializer.attribute(null, "version","1.0");
-                            serializer.attribute(null,"xmlns:xsi","http://www.w3.org/2001/XMLSchema-instance");
-
-                            serializer.startTag(null,"trk");
-
-                            serializer.startTag(null,"name");
-                            serializer.text("emulate");
-                            serializer.endTag(null,"name");
-
-                            serializer.startTag(null,"trkseg");
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-
-
-                        requestNewLocationData();
+                        create_gpx_file(filename);
                     }
                     else{
                         Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
@@ -230,59 +204,259 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 mFusedLocationClient.removeLocationUpdates(mLocationCallback);
                 //Close XML
-                try {
-                    serializer.endTag(null,"trkseg");
-                    serializer.endTag(null,"trk");
-                    serializer.endTag(null,"gpx");
-
-                    serializer.endDocument();
-                    serializer.flush();
-
-                    fos.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                finish_gpx_file();
 
             }
         });
     }
+
+
+
+    //Read GPX --- Playback
+    private void open_gpx_read(){
+        String filename = "Rec1.gpx";
+
+        try {
+            fis = new FileInputStream(new File(getFilesDir(), filename));
+            factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(true);
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+
+
+        try {
+            gpx_parser = factory.newPullParser();
+            gpx_parser.setInput(fis, null);
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+
+
+        try {
+            int eventType = gpx_parser.getEventType();
+
+            while (true) {
+
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (gpx_parser.getName().equals("trkseg")) {
+                        gpx_parser.next();
+                        gpx_parser.next();
+                        break;
+                    }
+                    else
+                        gpx_parser.getName();
+                }
+                else if (eventType == XmlPullParser.END_TAG) {
+                    gpx_parser.getName();
+                }
+                else if (eventType == XmlPullParser.TEXT) {
+                    gpx_parser.getText();
+                }
+
+                eventType = gpx_parser.next();
+            }
+
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
+    private void start_gps_playback(){
+
+        if(gpx_parser==null){
+            open_gpx_read();
+        }
+
+        play = true;
+
+        if(play){
+
+            GeoPoint startPoint = get_next_location();
+            if (startPoint==null){
+                stop_gps_playback();
+                return;
+            }
+            mapController.setCenter(startPoint);
+
+            if (prev_marker!=null){
+                map.getOverlays().remove(prev_marker);
+            }
+            Marker marker = new Marker(map);
+            marker.setPosition(startPoint);
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+            map.getOverlays().add(marker);
+            marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
+            prev_marker = marker;
+            map.invalidate();
+        }
+    }
+
+    private void stop_gps_playback(){
+        play = false;
+        gpx_parser = null;
+        factory = null;
+    }
+
+
+    private GeoPoint get_next_location(){
+
+        Log.d("next_lo",gpx_parser.getName());
+
+        if(gpx_parser.getName().equals("trkseg")){
+            return null;
+        }
+
+        Log.d("next_lo",gpx_parser.getAttributeValue(null,"lat"));
+
+        Double Latitude =  Double.parseDouble(gpx_parser.getAttributeValue(null,"lat"));
+        Double Longitude = Double.parseDouble(gpx_parser.getAttributeValue(null,"lon"));
+        GeoPoint startPoint = new GeoPoint(Latitude,Longitude);
+
+        try {
+            gpx_parser.next();
+            gpx_parser.getText();//blank
+            gpx_parser.next();
+            gpx_parser.getName();//ele
+            gpx_parser.next();
+            gpx_parser.getText();//ele value
+            gpx_parser.next();
+            gpx_parser.getName();//ele close
+            gpx_parser.next();
+            gpx_parser.getText();//Blank
+            gpx_parser.next();
+            gpx_parser.getName();//Time
+            gpx_parser.next();
+            gpx_parser.getText();//Time value
+            gpx_parser.next();
+            gpx_parser.getName();//Time close
+            gpx_parser.next();
+            gpx_parser.getText();//Blank
+
+            gpx_parser.next();
+            gpx_parser.getName();// trkpt close
+            gpx_parser.next();
+            gpx_parser.getText();//Blank
+
+            gpx_parser.next();
+            Log.d("ss", gpx_parser.getName());//new trkpt
+
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+        return startPoint;
+    }
+
+
+
+
+
+
+
+    //For new GPX --- storing while recording
+    private void  create_gpx_file(String filename){
+        //Dedide naming convention for filename
+        Log.d("oss","Trying crete file");
+        try {
+            fos = new FileOutputStream(new File(getFilesDir(), filename));
+            Log.d("oss","Opened file"+getFilesDir());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        serializer = Xml.newSerializer();
+
+        try {
+            serializer.setOutput(fos, "UTF-8");
+            serializer.startDocument(null, Boolean.valueOf(true));
+
+            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
+
+            serializer.startTag(null, "gpx");
+            serializer.attribute(null, "version","1.0");
+            serializer.attribute(null,"xmlns:xsi","http://www.w3.org/2001/XMLSchema-instance");
+
+            serializer.startTag(null,"trk");
+
+            serializer.startTag(null,"name");
+            serializer.text("emulate");
+            serializer.endTag(null,"name");
+
+            serializer.startTag(null,"trkseg");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        requestNewLocationData();
+    }
+
+
+
+    private void finish_gpx_file(){
+        try {
+
+            if(serializer!=null){
+                serializer.endTag(null,"trkseg");
+                serializer.endTag(null,"trk");
+                serializer.endTag(null,"gpx");
+
+                serializer.endDocument();
+                serializer.flush();
+
+                fos.close();
+                serializer = null;
+                Log.d("oss","Closed file");
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void update_location_gpx(Double Latitude, Double Longitude){
+        try {
+            serializer.startTag(null, "trkpt");
+            serializer.attribute(null,"lat", Double.toString(Latitude));
+            serializer.attribute(null,"lon", Double.toString(Longitude));
+
+            serializer.startTag(null,"ele");
+            serializer.text("0.000000");
+            serializer.endTag(null,"ele");
+
+            serializer.startTag(null,"time");
+
+            String time = sdf.format(System.currentTimeMillis());
+
+            serializer.text(time);
+            serializer.endTag(null,"time");
+
+            serializer.endTag(null, "trkpt");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
 
     private LocationCallback mLocationCallback = new LocationCallback() {
         @Override
         public void onLocationResult(LocationResult locationResult) {
             Location mLastLocation = locationResult.getLastLocation();
 
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 
             String text_disp = sdf.format(System.currentTimeMillis()) + " Latitude"+Double.toString(mLastLocation.getLatitude()) + "Longitude" + Double.toString(mLastLocation.getLongitude());
             mlocation.setText(text_disp);
             //Write to XML
-
-            try {
-                serializer.startTag(null, "trkpt");
-                serializer.attribute(null,"lat", Double.toString(mLastLocation.getLatitude()));
-                serializer.attribute(null,"lon", Double.toString(mLastLocation.getLongitude()));
-
-                serializer.startTag(null,"ele");
-                serializer.text("0.000000");
-                serializer.endTag(null,"ele");
-
-                serializer.startTag(null,"time");
-
-                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                String time = sdf.format(System.currentTimeMillis());
-
-                serializer.text(time);
-                serializer.endTag(null,"time");
-
-                serializer.endTag(null, "trkpt");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
+            update_location_gpx(mLastLocation.getLatitude(),mLastLocation.getLongitude());
         }
     };
+
 
     @SuppressLint("MissingPermission")
     private void getLastLocation(){
@@ -307,8 +481,6 @@ public class MainActivity extends AppCompatActivity {
         LocationRequest mLocationRequest = new LocationRequest();
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         mLocationRequest.setInterval(500);
-//        mLocationRequest.setFastestInterval(100);
-//        mLocationRequest.setNumUpdates(1);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.requestLocationUpdates(
@@ -333,16 +505,6 @@ public class MainActivity extends AppCompatActivity {
                 PERMISSION_ID
         );
     }
-
-//    @Override
-//    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
-//        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
-//        if (requestCode==PERMISSION_ID){
-//            if (grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
-//                //Start getting location info
-//            }
-//        }
-//    }
 
 
     private boolean isLocationEnabled(){

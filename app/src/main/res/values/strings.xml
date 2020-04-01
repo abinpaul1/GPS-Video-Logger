@@ -3,4 +3,6 @@
     <string name="location_data">location data</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
 </resources>
