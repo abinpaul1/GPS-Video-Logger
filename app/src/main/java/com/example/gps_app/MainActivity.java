@@ -234,27 +234,29 @@ public class MainActivity extends AppCompatActivity {
 
         if(gpx_parser==null){
             open_gpx_read();
+            play = true;
+
+            //
+            update_map();
+            update_map();
+
+            final Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if(play){
+                        update_map();
+                        handler.postDelayed(this,current_delay);
+                    }
+                    else{
+                        handler.removeCallbacks(this);
+                    }
+                }
+            }, current_delay);
         }
-
-        play = true;
-
-        //
-        update_map();
-        update_map();
-
-        final Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if(play){
-                    update_map();
-                    handler.postDelayed(this,current_delay);
-                }
-                else{
-                    handler.removeCallbacks(this);
-                }
-            }
-        }, current_delay);
+        else{
+            Toast.makeText(getApplicationContext(),"Playback already started",Toast.LENGTH_SHORT).show();
+        }
 
     }
 

@@ -78,6 +78,12 @@ public class Recording extends AppCompatActivity{
             requestPermissions();
         }
 
+        //Check if location is enabled
+        if(!isLocationEnabled()){
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+        }
+
         //Initializing
         captureButton = (Button) findViewById(R.id.button_capture);
         // Create an instance of Camera
@@ -116,6 +122,7 @@ public class Recording extends AppCompatActivity{
                         } else {
                             // initialize video camera
                             if (prepareVideoRecorder()) {
+
                                 // Camera is available and unlocked, MediaRecorder is prepared,
                                 // now you can start recording
                                 mediaRecorder.start();
