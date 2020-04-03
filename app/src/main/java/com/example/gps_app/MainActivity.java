@@ -21,11 +21,9 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 
 import org.osmdroid.api.IMapController;
@@ -34,8 +32,6 @@ import org.osmdroid.config.IConfigurationProvider;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapController;
 import org.osmdroid.views.overlay.Marker;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -56,27 +52,18 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.views.MapView;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 
 public class MainActivity extends AppCompatActivity {
 
     int PERMISSION_ID = 44;
-    private int number = 0;
     FusedLocationProviderClient mFusedLocationClient;
 
-    Button start_button,stop_button,play_button,pause_button;
-    TextView mlocation;
-
-    FileOutputStream fos;
-    XmlSerializer serializer;
+    Button play_button,pause_button;
 
     FileInputStream fis;
     XmlPullParserFactory factory;
@@ -95,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
     Boolean play;
 
     long current_delay = 500;
+
+    VideoView mVideoView;
 
 
     @Override
@@ -124,11 +113,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        start_button = (Button) findViewById(R.id.start_button);
-        stop_button = (Button) findViewById(R.id.stop_button);
+
         pause_button = (Button) findViewById(R.id.pause_button);
         play_button = (Button) findViewById(R.id.play_button);
-        mlocation = (TextView) findViewById(R.id.textView);
 
         map = (MapView) findViewById(R.id.map);
         map.setTileSource(TileSourceFactory.MAPNIK);
@@ -140,35 +127,7 @@ public class MainActivity extends AppCompatActivity {
         mapController = map.getController();
         mapController.setZoom(18.0);
 
-
-//        Timer timer = new Timer();
-//        //Set the schedule function
-//        timer.scheduleAtFixedRate(new TimerTask() {
-//                                      @Override
-//                                      public void run() {
-//                                          // Magic here
-//                                          number = number + 1;
-//                                          runOnUiThread(new Runnable() {
-//                                              @Override
-//                                              public void run() {
-//                                                  GeoPoint startPoint = new GeoPoint(10.0251+number*0.0001, 76.3459);
-//                                                  mapController.setCenter(startPoint);
-//
-//                                                  if (prev_marker!=null){
-//                                                      map.getOverlays().remove(prev_marker);
-//                                                  }
-//                                                  Marker marker = new Marker(map);
-//                                                  marker.setPosition(startPoint);
-//                                                  marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-//                                                  map.getOverlays().add(marker);
-//                                                  marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
-//                                                  prev_marker = marker;
-//                                                  map.invalidate();
-//                                              }
-//                                          });
-//                                      }
-//                                  },
-//                0, 3000);
+        mVideoView = (VideoView) findViewById(R.id.videoView);
 
 
         play_button.setOnClickListener(new View.OnClickListener() {
@@ -186,41 +145,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-
-        start_button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (checkPermissions()){
-                    if (isLocationEnabled()){
-                        //New XML
-                        String filename = "Rec1.gpx";
-                        create_gpx_file(filename);
-                    }
-                    else{
-                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivity(intent);
-                    }
-                }
-                else{
-                    requestPermissions();
-                    if (!isLocationEnabled()){
-                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivity(intent);
-                    }
-                }
-            }
-        });
-
-        stop_button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-                //Close XML
-                finish_gpx_file();
-
-            }
-        });
     }
 
 
@@ -401,140 +325,6 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
-
-
-
-    //For new GPX --- storing while recording
-    private void  create_gpx_file(String filename){
-        //Dedide naming convention for filename
-        Log.d("oss","Trying crete file");
-        try {
-            fos = new FileOutputStream(new File(getFilesDir(), filename));
-            Log.d("oss","Opened file"+getFilesDir());
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        serializer = Xml.newSerializer();
-
-        try {
-            serializer.setOutput(fos, "UTF-8");
-            serializer.startDocument(null, Boolean.valueOf(true));
-
-            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
-
-            serializer.startTag(null, "gpx");
-            serializer.attribute(null, "version","1.0");
-            serializer.attribute(null,"xmlns:xsi","http://www.w3.org/2001/XMLSchema-instance");
-
-            serializer.startTag(null,"trk");
-
-            serializer.startTag(null,"name");
-            serializer.text("emulate");
-            serializer.endTag(null,"name");
-
-            serializer.startTag(null,"trkseg");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        requestNewLocationData();
-    }
-
-
-
-    private void finish_gpx_file(){
-        try {
-
-            if(serializer!=null){
-                serializer.endTag(null,"trkseg");
-                serializer.endTag(null,"trk");
-                serializer.endTag(null,"gpx");
-
-                serializer.endDocument();
-                serializer.flush();
-
-                fos.close();
-                serializer = null;
-                Log.d("oss","Closed file");
-            }
-
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void update_location_gpx(Double Latitude, Double Longitude){
-        try {
-            serializer.startTag(null, "trkpt");
-            serializer.attribute(null,"lat", Double.toString(Latitude));
-            serializer.attribute(null,"lon", Double.toString(Longitude));
-
-            serializer.startTag(null,"ele");
-            serializer.text("0.000000");
-            serializer.endTag(null,"ele");
-
-            serializer.startTag(null,"time");
-
-            String time = sdf.format(System.currentTimeMillis());
-
-            serializer.text(time);
-            serializer.endTag(null,"time");
-
-            serializer.endTag(null, "trkpt");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-
-
-    private LocationCallback mLocationCallback = new LocationCallback() {
-        @Override
-        public void onLocationResult(LocationResult locationResult) {
-            Location mLastLocation = locationResult.getLastLocation();
-
-
-            String text_disp = sdf.format(System.currentTimeMillis()) + " Latitude"+Double.toString(mLastLocation.getLatitude()) + "Longitude" + Double.toString(mLastLocation.getLongitude());
-            mlocation.setText(text_disp);
-            //Write to XML
-            update_location_gpx(mLastLocation.getLatitude(),mLastLocation.getLongitude());
-        }
-    };
-
-
-    @SuppressLint("MissingPermission")
-    private void getLastLocation(){
-        if (checkPermissions()){
-            if (isLocationEnabled()){
-                requestNewLocationData();
-            }
-            else{
-                Toast.makeText(this, "Turn on location", Toast.LENGTH_LONG).show();
-                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                startActivity(intent);
-            }
-        }
-        else{
-            requestPermissions();
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    private void requestNewLocationData(){
-
-        LocationRequest mLocationRequest = new LocationRequest();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(500);
-
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        mFusedLocationClient.requestLocationUpdates(
-                mLocationRequest, mLocationCallback,
-                Looper.myLooper()
-        );
-    }
 
 
     private boolean checkPermissions(){
