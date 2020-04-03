@@ -101,6 +101,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        Intent intent = new Intent(this, Recording.class);
+        startActivity(intent);
+
 //        load/initialize the osmdroid configuration, this can be done
 //        setting this before the layout is inflated is a good idea
 //        it 'should' ensure that the map has a writable location for the map cache, even without permissions

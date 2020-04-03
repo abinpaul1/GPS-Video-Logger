@@ -5,4 +5,7 @@
     <string name="stop">Stop</string>
     <string name="play">Play</string>
     <string name="pause">Pause</string>
+    <string name="switch_camera">Switch Camera</string>
+    <string name="capture_stop">Capture/Stop</string>
+    <string name="capture">Capture</string>
 </resources>
