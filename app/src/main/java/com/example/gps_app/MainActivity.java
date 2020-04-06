@@ -4,22 +4,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.preference.PreferenceManager;
-import android.provider.Settings;
 import android.util.Log;
-import android.util.Xml;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
@@ -28,29 +23,18 @@ import com.google.android.gms.location.LocationServices;
 
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
-import org.osmdroid.config.IConfigurationProvider;
 import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.MapController;
 import org.osmdroid.views.overlay.Marker;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlSerializer;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Map;
+
 import java.util.TimeZone;
 
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
@@ -129,6 +113,11 @@ public class MainActivity extends AppCompatActivity {
 
         mVideoView = (VideoView) findViewById(R.id.videoView);
 
+        //Location of Video File
+        Uri uri = Uri.parse(getFilesDir().getAbsolutePath()+"/Rec1.mp4");
+        mVideoView.setVideoURI(uri);
+        mVideoView.requestFocus();
+
 
         play_button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -147,6 +136,12 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stop_gps_playback();
+        mVideoView.stopPlayback();
+    }
 
 
     //Read GPX --- Playback
@@ -232,11 +227,16 @@ public class MainActivity extends AppCompatActivity {
     //Start playback for click updation--- every click map updates
     private void start_gps_playback(){
 
-        if(gpx_parser==null){
+        if(gpx_parser==null && !mVideoView.isPlaying()){
             open_gpx_read();
             play = true;
 
-            //
+
+            //Start video playing
+            mVideoView.seekTo(0);
+            mVideoView.start();
+
+            //Update to initial position
             update_map();
             update_map();
 
@@ -266,6 +266,9 @@ public class MainActivity extends AppCompatActivity {
         play = false;
         gpx_parser = null;
         factory = null;
+        if (mVideoView.isPlaying()){
+            mVideoView.pause();
+        }
     }
 
 

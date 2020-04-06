@@ -1,46 +1,34 @@
 package com.example.gps_app;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.TimeZone;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
-import android.hardware.Camera.CameraInfo;
 import android.location.Location;
 import android.location.LocationManager;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Xml;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -66,6 +54,8 @@ public class Recording extends AppCompatActivity{
     FileOutputStream fos;
     XmlSerializer serializer;
     SimpleDateFormat sdf;
+
+    LocationRequest mLocationRequest;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -146,8 +136,15 @@ public class Recording extends AppCompatActivity{
         );
 
 
+        //Setting up location request
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setInterval(500);
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
     }
+
+
 
 
     public static Camera getCameraInstance(){
@@ -352,12 +349,6 @@ public class Recording extends AppCompatActivity{
 
     @SuppressLint("MissingPermission")
     private void requestNewLocationData(){
-
-        LocationRequest mLocationRequest = new LocationRequest();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(500);
-
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.requestLocationUpdates(
                 mLocationRequest, mLocationCallback,
                 Looper.myLooper()
@@ -389,6 +380,5 @@ public class Recording extends AppCompatActivity{
                 PERMISSION_ID
         );
     }
-
 
 }
