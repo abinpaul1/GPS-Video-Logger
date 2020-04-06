@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -122,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
         play_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                start_gps_playback();
+                start_playback();
             }
         });
 
@@ -131,13 +132,21 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 stop_gps_playback();
+                //Video may be longer than gpx file
+                stop_video_playback();
             }
         });
 
+        mVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mediaPlayer) {
+                stop_video_playback();
+            }
+        });
     }
 
     @Override
-    protected void onPause() {
+    protected void onPause(){
         super.onPause();
         stop_gps_playback();
         mVideoView.stopPlayback();
@@ -206,8 +215,8 @@ public class MainActivity extends AppCompatActivity {
     private void update_map(){
         GeoPoint startPoint = get_next_location();
         if (startPoint==null){
-            stop_gps_playback();
-            return;
+                stop_gps_playback();
+                return;
         }
         mapController.setCenter(startPoint);
 
@@ -225,39 +234,34 @@ public class MainActivity extends AppCompatActivity {
 
 
     //Start playback for click updation--- every click map updates
-    private void start_gps_playback(){
+    private void start_playback(){
 
-        if(gpx_parser==null && !mVideoView.isPlaying()){
-            open_gpx_read();
-            play = true;
+           if(!mVideoView.isPlaying() && gpx_parser==null){
+               open_gpx_read();
+               play = true;
 
+               start_video_playback();
+               //Update to initial position
+               update_map();
+               update_map();
 
-            //Start video playing
-            mVideoView.seekTo(0);
-            mVideoView.start();
-
-            //Update to initial position
-            update_map();
-            update_map();
-
-            final Handler handler = new Handler();
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if(play){
-                        update_map();
-                        handler.postDelayed(this,current_delay);
-                    }
-                    else{
-                        handler.removeCallbacks(this);
-                    }
-                }
-            }, current_delay);
-        }
-        else{
-            Toast.makeText(getApplicationContext(),"Playback already started",Toast.LENGTH_SHORT).show();
-        }
-
+               final Handler handler = new Handler();
+               handler.postDelayed(new Runnable() {
+                   @Override
+                   public void run() {
+                       if(play){
+                           update_map();
+                           handler.postDelayed(this,current_delay);
+                       }
+                       else{
+                           handler.removeCallbacks(this);
+                       }
+                   }
+               }, current_delay);
+           }
+           else{
+                 Toast.makeText(getApplicationContext(),"Playback already started",Toast.LENGTH_SHORT).show();
+           }
     }
 
 
@@ -266,6 +270,15 @@ public class MainActivity extends AppCompatActivity {
         play = false;
         gpx_parser = null;
         factory = null;
+    }
+    
+    private void start_video_playback(){
+        //Start video playing
+        mVideoView.seekTo(0);
+        mVideoView.start();
+    }
+    
+    private void stop_video_playback(){
         if (mVideoView.isPlaying()){
             mVideoView.pause();
         }
