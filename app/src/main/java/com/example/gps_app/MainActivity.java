@@ -19,9 +19,6 @@ import android.widget.Button;
 import android.widget.Toast;
 import android.widget.VideoView;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
@@ -46,28 +43,26 @@ import org.osmdroid.views.MapView;
 public class MainActivity extends AppCompatActivity {
 
     int PERMISSION_ID = 44;
-    FusedLocationProviderClient mFusedLocationClient;
 
-    Button play_button,pause_button;
+    long current_delay = 500;
+    long prev_time;
+
+    SimpleDateFormat sdf;
 
     FileInputStream fis;
     XmlPullParserFactory factory;
     XmlPullParser gpx_parser;
 
-    long prev_time;
-
-
     MapView map = null;
     IMapController mapController;
-
     Marker prev_marker = null;
 
-    SimpleDateFormat sdf;
+
 
     Boolean play;
 
-    long current_delay = 500;
 
+    Button play_button,pause_button;
     VideoView mVideoView;
 
 
@@ -78,7 +73,12 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, Recording.class);
         startActivity(intent);
 
-//        load/initialize the osmdroid configuration, this can be done
+        //Setting time format
+        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+
+//        Load/initialize the osmdroid configuration, this can be done
 //        setting this before the layout is inflated is a good idea
 //        it 'should' ensure that the map has a writable location for the map cache, even without permissions
 //        if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
@@ -87,32 +87,29 @@ public class MainActivity extends AppCompatActivity {
         Context ctx = getApplicationContext();
         Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
 
-
-
         org.osmdroid.config.IConfigurationProvider osmConf = org.osmdroid.config.Configuration.getInstance();
         File basePath = new File(getFilesDir().getAbsolutePath()+"/osmdroid");
         osmConf.setOsmdroidBasePath(basePath);
         File tileCache = new File(getFilesDir().getAbsolutePath()+"/osmdroid/tiles");
         osmConf.setOsmdroidTileCache(tileCache);
 
+
         setContentView(R.layout.activity_main);
 
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+        // Buttons and video view
         pause_button = (Button) findViewById(R.id.pause_button);
         play_button = (Button) findViewById(R.id.play_button);
+        mVideoView = (VideoView) findViewById(R.id.videoView);
 
+
+        //Configuring map display
         map = (MapView) findViewById(R.id.map);
         map.setTileSource(TileSourceFactory.MAPNIK);
-
-        //Setting time format
-        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         mapController = map.getController();
         mapController.setZoom(18.0);
 
-        mVideoView = (VideoView) findViewById(R.id.videoView);
 
         //Location of Video File
         Uri uri = Uri.parse(getFilesDir().getAbsolutePath()+"/Rec1.mp4");
@@ -153,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    //Read GPX --- Playback
+    // Open and start reading from GPX file
     private void open_gpx_read(){
         String filename = "Rec1.gpx";
 
@@ -211,29 +208,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    //Update map with current value
+    //Update map with current co-ordinates
     private void update_map(){
-        GeoPoint startPoint = get_next_location();
-        if (startPoint==null){
+        GeoPoint nextGeoPoint = get_next_location();
+        if (nextGeoPoint==null){
                 stop_gps_playback();
                 return;
         }
-        mapController.setCenter(startPoint);
+        mapController.setCenter(nextGeoPoint);
 
         if (prev_marker!=null){
             map.getOverlays().remove(prev_marker);
         }
         Marker marker = new Marker(map);
-        marker.setPosition(startPoint);
+        marker.setPosition(nextGeoPoint);
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(marker);
-        marker.setIcon(MainActivity.this.getDrawable(R.drawable.center));
+        marker.setIcon(MainActivity.this.getResources().getDrawable(R.drawable.center));
         prev_marker = marker;
         map.invalidate();
     }
 
-
-    //Start playback for click updation--- every click map updates
+    
+    // Function to begin playing of video and gps data
     private void start_playback(){
 
            if(!mVideoView.isPlaying() && gpx_parser==null){
@@ -266,18 +263,19 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void stop_gps_playback(){
-
         play = false;
         gpx_parser = null;
         factory = null;
     }
-    
+
+
     private void start_video_playback(){
         //Start video playing
         mVideoView.seekTo(0);
         mVideoView.start();
     }
-    
+
+
     private void stop_video_playback(){
         if (mVideoView.isPlaying()){
             mVideoView.pause();
@@ -285,19 +283,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    //Get next location from currently open gpx file
     private GeoPoint get_next_location(){
 
-        Log.d("next_lo",gpx_parser.getName());
 
         if(gpx_parser.getName().equals("trkseg")){
             return null;
         }
 
-        Log.d("next_lo",gpx_parser.getAttributeValue(null,"lat"));
 
         Double Latitude =  Double.parseDouble(gpx_parser.getAttributeValue(null,"lat"));
         Double Longitude = Double.parseDouble(gpx_parser.getAttributeValue(null,"lon"));
-        GeoPoint startPoint = new GeoPoint(Latitude,Longitude);
+        GeoPoint nextGeoPoint = new GeoPoint(Latitude,Longitude);
 
         try {
             gpx_parser.next();
@@ -313,13 +310,16 @@ public class MainActivity extends AppCompatActivity {
             gpx_parser.next();
             gpx_parser.getName();//Time
             gpx_parser.next();
-            //Updating time
+            
+            //Updating time to wait before fetching next location from gpx file
             long new_time = sdf.parse(gpx_parser.getText(),new ParsePosition(0)).getTime();
             Log.d("time",Long.toString(new_time));
             Log.d("time",Long.toString(prev_time));
             current_delay =  new_time - prev_time; //Time value
             prev_time = new_time;
             Log.d("time",Long.toString(current_delay));
+            
+            
             gpx_parser.next();
             gpx_parser.getName();//Time close
             gpx_parser.next();
@@ -331,14 +331,14 @@ public class MainActivity extends AppCompatActivity {
             gpx_parser.getText();//Blank
 
             gpx_parser.next();
-            Log.d("ss", gpx_parser.getName());//new trkpt
+            gpx_parser.getName();//new trkpt
 
         }
         catch (IOException | XmlPullParserException e){
-            Log.d("EXCEPRION","here");
             e.printStackTrace();
         }
-        return startPoint;
+        
+        return nextGeoPoint;
     }
 
 
@@ -364,7 +364,6 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isLocationEnabled(){
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
     }
 
