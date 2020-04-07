@@ -70,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Intent intent = new Intent(this, Recording.class);
+        Intent intent = new Intent(this, FilePicker.class);
         startActivity(intent);
 
         //Setting time format

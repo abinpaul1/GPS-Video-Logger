@@ -78,6 +78,7 @@ public class Recording extends AppCompatActivity{
 
         //Checking permissions
         if (!checkPermissions()){
+            Log.d("Permission","Insufficient");
             requestPermissions();
         }
 
@@ -92,7 +93,8 @@ public class Recording extends AppCompatActivity{
                 File.separator + "GPS_Video_Logger");
         if (!folder.exists()) {
             //Handle error in making folder
-            folder.mkdirs();
+            boolean success = folder.mkdir();
+            Log.d("Folder-Creation",Boolean.toString(success));
         }
 
 
