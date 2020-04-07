@@ -8,4 +8,5 @@
     <string name="switch_camera">Switch Camera</string>
     <string name="record_stop">Stop</string>
     <string name="record">Record</string>
+    <string name="title_activity_file_picker">FilePicker</string>
 </resources>

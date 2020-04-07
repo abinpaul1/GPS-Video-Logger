@@ -10,6 +10,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.TimeZone;
 
 import android.Manifest;
@@ -25,6 +26,7 @@ import android.location.LocationManager;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
@@ -49,7 +51,8 @@ public class Recording extends AppCompatActivity{
     private static final int PERMISSION_ID = 44;
     private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
     private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
-    
+
+    private String filename;
 
     Camera mCamera;
     int cameraId;
@@ -83,6 +86,15 @@ public class Recording extends AppCompatActivity{
             Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
             startActivity(intent);
         }
+
+        //Check for app folder
+        File folder = new File(Environment.getExternalStorageDirectory() +
+                File.separator + "GPS_Video_Logger");
+        if (!folder.exists()) {
+            //Handle error in making folder
+            folder.mkdirs();
+        }
+
 
         //Setting the time format
         sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
@@ -126,10 +138,12 @@ public class Recording extends AppCompatActivity{
                             mCamera.lock();         // take camera access back from MediaRecorder
 
                             // Inform the user that recording has stopped
-                            recordButton.setText(R.string.record);
+                            recordButton.setBackgroundResource(R.drawable.rec);
                             isRecording = false;
 
                         } else {
+
+                            filename = new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
 
                             // Initialize video camera
                             if (prepareVideoRecorder()) {
@@ -139,13 +153,12 @@ public class Recording extends AppCompatActivity{
                                 mediaRecorder.start();
 
                                 //Create new GPX file and start recording location data
-                                String filename = "Rec1.gpx";
-                                create_gpx_file(filename);
+                                create_gpx_file(filename+".gpx");
                                 recordLocationData();
 
 
                                 // Inform the user that recording has started
-                                recordButton.setText(R.string.record_stop);
+                                recordButton.setBackgroundResource(R.drawable.stop);
                                 isRecording = true;
                             } else {
 
@@ -217,13 +230,21 @@ public class Recording extends AppCompatActivity{
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
 
         // Step 3: Set a CamcorderProfile
-        CamcorderProfile profile =  CamcorderProfile.get(VIDEO_QUALITY);
+        CamcorderProfile profile;
+        if(CamcorderProfile.hasProfile(VIDEO_QUALITY)){
+            //Checking if the profile is available
+            profile =  CamcorderProfile.get(VIDEO_QUALITY);
+        }
+        else{
+            profile = CamcorderProfile.get(CamcorderProfile.QUALITY_LOW);
+        }
         profile.fileFormat = VIDEO_FORMAT;
         mediaRecorder.setProfile(profile);
 
 
         // Step 4: Set output file
-        mediaRecorder.setOutputFile(getFilesDir().getAbsolutePath()+"/Rec1.mp4");
+        mediaRecorder.setOutputFile(Environment.getExternalStorageDirectory() +
+                File.separator + "GPS_Video_Logger" + File.separator + filename +".mp4");
 
         // Step 5: Set the preview output
         mediaRecorder.setPreviewDisplay(mPreview.getHolder().getSurface());
@@ -330,8 +351,9 @@ public class Recording extends AppCompatActivity{
         //Decide naming convention for filename
         Log.d("oss","Trying crete file");
         try {
-            fos = new FileOutputStream(new File(getFilesDir(), filename));
-            Log.d("oss","Opened file"+getFilesDir());
+            fos = new FileOutputStream(new File( Environment.getExternalStorageDirectory() +
+                    File.separator + "GPS_Video_Logger", filename));
+            Log.d("oss","Opened file");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -446,7 +468,9 @@ public class Recording extends AppCompatActivity{
         if( ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this,Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this,Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this,Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ){
             return true;
         }
         return false;
@@ -456,7 +480,7 @@ public class Recording extends AppCompatActivity{
     private void requestPermissions(){
         ActivityCompat.requestPermissions(
                 this,
-                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO },
+                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE },
                 PERMISSION_ID
         );
     }
