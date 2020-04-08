@@ -29,7 +29,7 @@ public class FilePicker extends AppCompatActivity {
         recyclerView.setHasFixedSize(true);
 
         // use a linear layout manager
-        layoutManager = new LinearLayoutManager(this);
+        layoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
         recyclerView.setLayoutManager(layoutManager);
 
         // specify an adapter (see also next example)
@@ -51,8 +51,8 @@ public class FilePicker extends AppCompatActivity {
         {
 
             String file_name = files[i].getName();
-            // you can store name to arraylist and use it later
-            filenames.add(file_name);
+            if (file_name.endsWith(".mp4"))
+                filenames.add(file_name.split(".mp4")[0]);
         }
         return filenames;
     }

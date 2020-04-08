@@ -56,7 +56,6 @@
         android:layout_width="30dp"
         android:layout_height="30dp"
         android:background="@drawable/play"
-        android:text="@string/play"
         app:layout_constraintBottom_toTopOf="@+id/linearLayout"
         app:layout_constraintEnd_toStartOf="@+id/pause_button"
         app:layout_constraintStart_toStartOf="parent"

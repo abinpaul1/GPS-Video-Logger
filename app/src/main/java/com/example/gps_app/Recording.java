@@ -68,6 +68,7 @@ public class Recording extends AppCompatActivity{
     Button recordButton;
     boolean isRecording = false;
 
+    Button fileButton;
 
 
     @Override
@@ -105,6 +106,7 @@ public class Recording extends AppCompatActivity{
 
         //Initializing button
         recordButton = (Button) findViewById(R.id.record_button);
+        fileButton = (Button) findViewById(R.id.files_button);
 
         // Create an instance of Camera
         mCamera = getCameraInstance();
@@ -145,7 +147,7 @@ public class Recording extends AppCompatActivity{
 
                         } else {
 
-                            filename = new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
+                            filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
 
                             // Initialize video camera
                             if (prepareVideoRecorder()) {
@@ -175,6 +177,20 @@ public class Recording extends AppCompatActivity{
                 }
         );
 
+        // Launch Filepicker activity on clicking
+        fileButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (isRecording){
+                    Toast.makeText(Recording.this,"Recording in progress",Toast.LENGTH_SHORT).show();
+                }
+                else{
+                    Intent intent = new Intent(Recording.this, FilePicker.class);
+                    startActivity(intent);
+                }
+            }
+        });
+
         //Finding back-camera id
         cameraId = getBackCameraID();
 
@@ -191,11 +207,29 @@ public class Recording extends AppCompatActivity{
     protected void onPause() {
         super.onPause();
         releaseMediaRecorder();       // if you are using MediaRecorder, release it first
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback); //Stop location updates
         finish_gpx_file();
         releaseCamera();              // release the camera immediately on pause event
     }
-    
-    
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Create an instance of Camera
+        mCamera = getCameraInstance();
+
+        //Setting orientation of camera
+        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        mCamera.setDisplayOrientation(result);
+
+        // Create our Preview view and set it as the content of our activity.
+        mPreview = new CameraPreview(this, mCamera);
+        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
+        preview.addView(mPreview);
+    }
+
+
     //Detecting and adjusting preview camera based on orientation
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
@@ -294,6 +328,7 @@ public class Recording extends AppCompatActivity{
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
+            e.printStackTrace();
         }
         return c; // returns null if camera is unavailable
     }
@@ -346,12 +381,12 @@ public class Recording extends AppCompatActivity{
         return result;
     }
     
-    
+
+
 
     // Create gpx file
     private void  create_gpx_file(String filename){
-        //Decide naming convention for filename
-        Log.d("oss","Trying crete file");
+        Log.d("oss","Creating file");
         try {
             fos = new FileOutputStream(new File( Environment.getExternalStorageDirectory() +
                     File.separator + "GPS_Video_Logger", filename));
