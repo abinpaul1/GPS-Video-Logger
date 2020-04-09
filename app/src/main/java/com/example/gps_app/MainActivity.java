@@ -15,6 +15,7 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
@@ -44,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     //Error codes
     final private int INVALID_GPX_FILE = 1;
     final private int GPX_FILE_NOT_FOUND = 2;
+    final private int EMPTY_GPX_FILE = 3;
 
 
     long current_delay = 500;
@@ -66,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
 
     Button play_button,pause_button;
     VideoView mVideoView;
+    TextView filenameTextView;
 
 
     @Override
@@ -104,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
         pause_button = (Button) findViewById(R.id.pause_button);
         play_button = (Button) findViewById(R.id.play_button);
         mVideoView = (VideoView) findViewById(R.id.videoView);
+        filenameTextView = (TextView) findViewById(R.id.textView);
 
 
         //Configuring map display
@@ -119,6 +123,9 @@ public class MainActivity extends AppCompatActivity {
                 File.separator + "GPS_Video_Logger" + File.separator + filename +".mp4");
         mVideoView.setVideoURI(uri);
         mVideoView.requestFocus();
+
+        //Setting filename into textview
+        filenameTextView.setText(filename);
 
 
         play_button.setOnClickListener(new View.OnClickListener() {
@@ -144,6 +151,8 @@ public class MainActivity extends AppCompatActivity {
                 stop_video_playback();
             }
         });
+
+        start_playback();
     }
 
     @Override
@@ -165,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
             fis = new FileInputStream(new File( Environment.getExternalStorageDirectory() +
                     File.separator + "GPS_Video_Logger", gpx_filename));
             factory = XmlPullParserFactory.newInstance();
-            factory.setNamespaceAware(true);
+            factory.setNamespaceAware(false);
         }
         catch (IOException | XmlPullParserException e){
             e.printStackTrace();
@@ -185,17 +194,14 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-
+        int test_event = -1;
         //Parsing till trkpt
         try {
             int eventType = gpx_parser.getEventType();
 
             while (true) {
-
                 if (eventType == XmlPullParser.START_TAG){
                     if (gpx_parser.getName().equals("trkseg")){
-                        gpx_parser.next();
-                        gpx_parser.next();
                         break;
                     }
                     else
@@ -210,6 +216,40 @@ public class MainActivity extends AppCompatActivity {
 
                 eventType = gpx_parser.next();
             }
+
+
+            eventType = gpx_parser.next();
+            if(eventType == XmlPullParser.END_TAG){
+                Log.d("Eventtype",gpx_parser.getName());
+                if (gpx_parser.getName().equals("trkseg")){
+                    display_error_and_quit(EMPTY_GPX_FILE);
+                    return false;
+                }
+            }
+            else{
+                test_event = gpx_parser.next();
+                Log.d("Eventtype",Integer.toString(test_event)+gpx_parser.getName());
+            }
+
+            //Handling invalid gpx files and gpx files with no data
+//            if(eventType != XmlPullParser.START_TAG){
+//                gpx_parser.next();
+//                if (gpx_parser.getName().equals("trkseg"))
+//                    display_error_and_quit(EMPTY_GPX_FILE);
+//            }
+
+//            else{
+//                if(eventType == XmlPullParser.END_TAG){
+//                    if (gpx_parser.getName().equals("trkseg"))
+//                        display_error_and_quit(EMPTY_GPX_FILE);
+//                }
+//                else{
+//                    Log.d("Eventtype-inner",Integer.toString(eventType));
+//                    if(!gpx_parser.getName().equals("trkpt"))
+//                        display_error_and_quit(INVALID_GPX_FILE);
+//                }
+//            }
+
         }
         catch (IOException | XmlPullParserException e){
             e.printStackTrace();
@@ -374,9 +414,11 @@ public class MainActivity extends AppCompatActivity {
         Log.d("Error func called","Here");
         String err_msg = "";
         if (msg == INVALID_GPX_FILE)
-            err_msg = "Invalid GPX File!";
+            err_msg = "Invalid GPX file!";
         else if (msg == GPX_FILE_NOT_FOUND)
-            err_msg = "GPX File Not Found! If you copied a new file into the app folder, ensure the Video file and GPX file have the same name.";
+            err_msg = "GPX file not Found! If you copied a new file into the app folder, ensure the video file and GPX file have the same name.";
+        else if (msg == EMPTY_GPX_FILE)
+            err_msg = "The GPX file does not have track data. This could happen if you recorded a very short video. You can still access the video file in the app folder.";
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title

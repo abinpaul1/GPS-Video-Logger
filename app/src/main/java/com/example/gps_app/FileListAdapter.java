@@ -70,7 +70,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.ViewHo
         holder.mTextView.setText(mDataset.get(position));
 
         Bitmap bMap = ThumbnailUtils.createVideoThumbnail(Environment.getExternalStorageDirectory()
-                + File.separator + "GPS_Video_Logger" + File.separator + mDataset.get(position) + ".mp4", MediaStore.Video.Thumbnails.MICRO_KIND);
+                + File.separator + "GPS_Video_Logger" + File.separator + mDataset.get(position) + ".mp4", MediaStore.Video.Thumbnails.MINI_KIND);
         holder.mImageView.setImageBitmap(bMap);
 
 
