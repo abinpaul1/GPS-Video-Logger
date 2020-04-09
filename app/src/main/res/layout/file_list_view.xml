@@ -7,7 +7,7 @@
     app:cardUseCompatPadding="true"
     app:cardElevation="4dp"
     app:cardCornerRadius="3dp"
-    app:cardBackgroundColor="@android:color/holo_blue_dark">
+    app:cardBackgroundColor="#151515">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,7 +18,7 @@
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:padding="10dp"
-            app:civ_border_color="@android:color/white"/>
+            app:civ_border_color="#FFDD03"/>
 
         <TextView
             android:id="@+id/item_name"
@@ -28,7 +28,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginRight="8dp"
             android:gravity="center_vertical"
-            android:textColor="@android:color/white"
+            android:textColor="@color/colorText"
             android:textSize="17sp"
             android:textStyle="bold" />
 

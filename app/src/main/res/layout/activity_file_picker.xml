@@ -1,8 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/fileList"
-    android:scrollbars="vertical"
-    android:layout_width="match_parent"
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_height="match_parent"
-    android:background="@color/colorBackground"
-    xmlns:android="http://schemas.android.com/apk/res/android" />
+    android:layout_width="match_parent"
+    android:background="@color/colorBackground">
+
+    <TextView
+        android:id="@+id/fileHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="15dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginBottom="15dp"
+        android:text="@string/recordings"
+        android:textColor="@color/colorText"
+        android:textSize="30sp"
+        android:textStyle="bold"></TextView>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/fileList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/fileHeader"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="0dp"
+        android:layout_marginLeft="0dp"
+        android:layout_marginEnd="0dp"
+        android:layout_marginRight="0dp"
+        android:layout_marginBottom="0dp"
+        android:scrollbars="vertical" />
+
+</RelativeLayout>
+
