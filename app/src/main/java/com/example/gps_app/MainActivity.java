@@ -422,7 +422,7 @@ public class MainActivity extends AppCompatActivity {
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title
-        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this);
+        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this,R.style.DialogTheme);
         alertBuilder.setTitle("ERROR");
 
         // Setting Dialog Message

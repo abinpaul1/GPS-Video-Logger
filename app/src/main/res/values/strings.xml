@@ -10,4 +10,8 @@
     <string name="record">Record</string>
     <string name="title_activity_file_picker">FilePicker</string>
     <string name="recordings">My Journeys</string>
+
+    <string name="title_activity_fullscreen">FullscreenActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
 </resources>
