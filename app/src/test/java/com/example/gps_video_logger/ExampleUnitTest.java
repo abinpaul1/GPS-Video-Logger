@@ -1,4 +1,4 @@
-package com.example.gps_app;
+package com.example.gps_video_logger;
 
 import org.junit.Test;
 

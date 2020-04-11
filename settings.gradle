@@ -1,2 +1,2 @@
 include ':app'
-rootProject.name='GPS_App'
+rootProject.name='GPS Video Logger'

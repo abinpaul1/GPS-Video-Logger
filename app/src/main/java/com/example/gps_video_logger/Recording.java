@@ -1,4 +1,4 @@
-package com.example.gps_app;
+package com.example.gps_video_logger;
 
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,7 +16,9 @@ import java.util.TimeZone;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -70,6 +72,8 @@ public class Recording extends AppCompatActivity{
 
     Button fileButton;
 
+    Button aboutButton;
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -107,6 +111,7 @@ public class Recording extends AppCompatActivity{
         //Initializing button
         recordButton = (Button) findViewById(R.id.record_button);
         fileButton = (Button) findViewById(R.id.files_button);
+        aboutButton = (Button) findViewById(R.id.about_button);
 
         // Create an instance of Camera
         mCamera = getCameraInstance();
@@ -190,6 +195,36 @@ public class Recording extends AppCompatActivity{
                 }
             }
         });
+
+
+        // Help/About Button
+        aboutButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // Display alert showing usage specifications
+                if (!isRecording){
+                    // No corresponding GPX file. Ensure same name, Show alert before quit
+                    // Setting Dialog Title
+                    AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
+                    alertBuilder.setTitle("GPS Video Logger v1.0.0");
+
+                    // Setting Dialog Message
+                    alertBuilder.setMessage("Video format is mp4" +"\n"+
+                            "GPS track is saved in GPX file format" + "\n" +
+                            "Both files would have the same name" + "\n" +
+                            "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage");
+                    // Setting OK Button
+                    alertBuilder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                        }
+                    });
+
+                    AlertDialog dialog = alertBuilder.create();
+                    dialog.show();
+                }
+            }
+        });
+
 
         //Finding back-camera id
         cameraId = getBackCameraID();

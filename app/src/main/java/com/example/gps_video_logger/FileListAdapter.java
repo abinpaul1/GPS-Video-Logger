@@ -1,6 +1,5 @@
-package com.example.gps_app;
+package com.example.gps_video_logger;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.media.ThumbnailUtils;

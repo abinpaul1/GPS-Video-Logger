@@ -31,6 +31,15 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 
+        <Button
+            android:id="@+id/about_button"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:layout_margin="7.5dp"
+            android:background="@drawable/about"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </LinearLayout>

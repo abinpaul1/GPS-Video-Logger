@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GPS_App</string>
+    <string name="app_name">GPS_Video Logger</string>
     <string name="location_data">location data</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
