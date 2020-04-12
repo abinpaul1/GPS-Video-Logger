@@ -40,7 +40,7 @@ import org.osmdroid.views.MapView;
 
 
 
-public class MainActivity extends AppCompatActivity {
+public class PlaybackActivity extends AppCompatActivity {
 
     //Error codes
     final private int INVALID_GPX_FILE = 1;
@@ -168,7 +168,10 @@ public class MainActivity extends AppCompatActivity {
     private boolean open_gpx_read(){
 
         String gpx_filename = filename + ".gpx";
-        Log.d("Fileo",gpx_filename);
+
+        Log.d("Fileo",Environment.getExternalStorageDirectory() +
+                File.separator + "GPS_Video_Logger" + "/" + gpx_filename);
+
         //Opening file and setting factory
         try {
             fis = new FileInputStream(new File( Environment.getExternalStorageDirectory() +
@@ -231,25 +234,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("Eventtype",Integer.toString(test_event)+gpx_parser.getName());
             }
 
-            //Handling invalid gpx files and gpx files with no data
-//            if(eventType != XmlPullParser.START_TAG){
-//                gpx_parser.next();
-//                if (gpx_parser.getName().equals("trkseg"))
-//                    display_error_and_quit(EMPTY_GPX_FILE);
-//            }
-
-//            else{
-//                if(eventType == XmlPullParser.END_TAG){
-//                    if (gpx_parser.getName().equals("trkseg"))
-//                        display_error_and_quit(EMPTY_GPX_FILE);
-//                }
-//                else{
-//                    Log.d("Eventtype-inner",Integer.toString(eventType));
-//                    if(!gpx_parser.getName().equals("trkpt"))
-//                        display_error_and_quit(INVALID_GPX_FILE);
-//                }
-//            }
-
         }
         catch (IOException | XmlPullParserException e){
             e.printStackTrace();
@@ -278,7 +262,7 @@ public class MainActivity extends AppCompatActivity {
         marker.setPosition(nextGeoPoint);
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(marker);
-        marker.setIcon(MainActivity.this.getResources().getDrawable(R.drawable.center));
+        marker.setIcon(PlaybackActivity.this.getResources().getDrawable(R.drawable.center));
         prev_marker = marker;
         map.invalidate();
     }
@@ -351,7 +335,7 @@ public class MainActivity extends AppCompatActivity {
             // Some problem in GPX file
             e.printStackTrace();
 //            display_error_and_quit(INVALID_GPX_FILE);
-            Toast.makeText(MainActivity.this,"Invalid gpx file",Toast.LENGTH_SHORT).show();
+            Toast.makeText(PlaybackActivity.this,"Invalid gpx file",Toast.LENGTH_SHORT).show();
             finish();
         }
 
@@ -422,7 +406,7 @@ public class MainActivity extends AppCompatActivity {
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title
-        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(MainActivity.this,R.style.DialogTheme);
+        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(PlaybackActivity.this,R.style.DialogTheme);
         alertBuilder.setTitle("ERROR");
 
         // Setting Dialog Message

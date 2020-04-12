@@ -80,7 +80,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.ViewHo
                 Log.d("Fileo",Integer.toString(holder.getAdapterPosition()));
                 selectedFilename = mDataset.get(holder.getAdapterPosition());
                 Log.d("Fileo",selectedFilename);
-                Intent PlaybackIntent = new Intent( view.getContext() , MainActivity.class);
+                Intent PlaybackIntent = new Intent( view.getContext() , PlaybackActivity.class);
                 PlaybackIntent.putExtra("filename",selectedFilename);
                 view.getContext().startActivity(PlaybackIntent);
             }

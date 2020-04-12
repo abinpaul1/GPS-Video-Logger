@@ -3,7 +3,6 @@ package com.example.gps_video_logger;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.core.app.ActivityCompat;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -13,14 +12,12 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.hardware.Camera;
 import android.location.Location;
@@ -50,9 +47,9 @@ public class Recording extends AppCompatActivity{
 
     
     //Constants
-    private static final int PERMISSION_ID = 44;
     private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
     private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
+
 
     private String filename;
 
@@ -78,28 +75,13 @@ public class Recording extends AppCompatActivity{
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
         setContentView(R.layout.activity_recording);
-
-
-        //Checking permissions
-        if (!checkPermissions()){
-            Log.d("Permission","Insufficient");
-            requestPermissions();
-        }
 
         //Check if location is enabled
         if(!isLocationEnabled()){
             Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
             startActivity(intent);
-        }
-
-        //Check for app folder
-        File folder = new File(Environment.getExternalStorageDirectory() +
-                File.separator + "GPS_Video_Logger");
-        if (!folder.exists()) {
-            //Handle error in making folder
-            boolean success = folder.mkdir();
-            Log.d("Folder-Creation",Boolean.toString(success));
         }
 
 
@@ -108,134 +90,24 @@ public class Recording extends AppCompatActivity{
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 
 
-        //Initializing button
+        //Initializing buttons and listeners
         recordButton = (Button) findViewById(R.id.record_button);
         fileButton = (Button) findViewById(R.id.files_button);
         aboutButton = (Button) findViewById(R.id.about_button);
 
-        // Create an instance of Camera
-        mCamera = getCameraInstance();
-
-        //Setting orientation of camera
-        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
-        mCamera.setDisplayOrientation(result);
-
-        // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(this, mCamera);
-        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
-        preview.addView(mPreview);
-
-        //Initialising location provider
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
 
         //Toggling record button to start and stop recording
-        recordButton.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        if (isRecording) {
-
-                            // stop recording and release camera
-                            mediaRecorder.stop();  // stop the recording
-
-                            //Close GPX File
-                            mFusedLocationClient.removeLocationUpdates(mLocationCallback);
-                            finish_gpx_file();
-
-                            releaseMediaRecorder(); // release the MediaRecorder object
-                            mCamera.lock();         // take camera access back from MediaRecorder
-
-                            // Inform the user that recording has stopped
-                            recordButton.setBackgroundResource(R.drawable.rec);
-                            isRecording = false;
-
-                        } else {
-
-                            filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
-
-                            // Initialize video camera
-                            if (prepareVideoRecorder()) {
-
-                                // Camera is available and unlocked, MediaRecorder is prepared,
-                                // now you can start recording
-                                mediaRecorder.start();
-
-                                //Create new GPX file and start recording location data
-                                create_gpx_file(filename+".gpx");
-                                recordLocationData();
-
-
-                                // Inform the user that recording has started
-                                recordButton.setBackgroundResource(R.drawable.stop);
-                                isRecording = true;
-                            } else {
-
-                                // If prepare didn't work, release the camera
-                                releaseMediaRecorder();
-                                // Inform user
-                                Toast.makeText(getApplicationContext(),"Some Error Occured",Toast.LENGTH_SHORT).show();
-                            }
-
-                        }
-                    }
-                }
-        );
+        recordButton.setOnClickListener(recordButtonOnClickListener);
 
         // Launch Filepicker activity on clicking
-        fileButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (isRecording){
-                    Toast.makeText(Recording.this,"Recording in progress",Toast.LENGTH_SHORT).show();
-                }
-                else{
-                    Intent intent = new Intent(Recording.this, FilePicker.class);
-                    startActivity(intent);
-                }
-            }
-        });
-
+        fileButton.setOnClickListener(fileButtonOnClickListener);
 
         // Help/About Button
-        aboutButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // Display alert showing usage specifications
-                if (!isRecording){
-                    // No corresponding GPX file. Ensure same name, Show alert before quit
-                    // Setting Dialog Title
-                    AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
-                    alertBuilder.setTitle("GPS Video Logger v1.0.0");
+        aboutButton.setOnClickListener(aboutButtonOnClickListener);
 
-                    // Setting Dialog Message
-                    alertBuilder.setMessage("Video format is mp4" +"\n"+
-                            "GPS track is saved in GPX file format" + "\n" +
-                            "Both files would have the same name" + "\n" +
-                            "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage");
-                    // Setting OK Button
-                    alertBuilder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                        }
-                    });
-
-                    AlertDialog dialog = alertBuilder.create();
-                    dialog.show();
-                }
-            }
-        });
-
-
-        //Finding back-camera id
-        cameraId = getBackCameraID();
-
-
-        //Setting up location request objects
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(500);
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
+        initialize_app_folder();
+        initialize_camera();
+        initialize_location();
     }
 
     @Override
@@ -244,7 +116,9 @@ public class Recording extends AppCompatActivity{
         releaseMediaRecorder();       // if you are using MediaRecorder, release it first
         mFusedLocationClient.removeLocationUpdates(mLocationCallback); //Stop location updates
         finish_gpx_file();
-        releaseCamera();              // release the camera immediately on pause event
+        stopPreview();
+        recordButton.setBackgroundResource(R.drawable.rec);
+        isRecording = false;
     }
 
 
@@ -264,6 +138,11 @@ public class Recording extends AppCompatActivity{
         preview.addView(mPreview);
     }
 
+    @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        releaseCamera();              // release the camera only on destroy event
+    }
 
     //Detecting and adjusting preview camera based on orientation
     @Override
@@ -275,6 +154,167 @@ public class Recording extends AppCompatActivity{
         Log.d("Cam",Integer.toString(result));
         mCamera.setDisplayOrientation(result);
     }
+
+
+
+
+
+
+
+
+
+    // OnClick listeners
+
+    private View.OnClickListener recordButtonOnClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (isRecording) {
+
+                // stop recording and release camera
+                mediaRecorder.stop();  // stop the recording
+
+                //Close GPX File
+                mFusedLocationClient.removeLocationUpdates(mLocationCallback);
+                finish_gpx_file();
+
+                releaseMediaRecorder(); // release the MediaRecorder object
+                mCamera.lock();         // take camera access back from MediaRecorder
+
+                // Inform the user that recording has stopped
+                recordButton.setBackgroundResource(R.drawable.rec);
+                isRecording = false;
+
+            } else {
+
+                filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
+
+                //Check if location is enabled
+                if(!isLocationEnabled()){
+                    Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                    startActivity(intent);
+
+                }
+                else{
+                    // Initialize video camera
+                    if (prepareVideoRecorder()) {
+
+                        // Camera is available and unlocked, MediaRecorder is prepared,
+                        // now you can start recording
+                        mediaRecorder.start();
+
+                        //Create new GPX file and start recording location data
+                        create_gpx_file(filename+".gpx");
+                        recordLocationData();
+
+
+                        // Inform the user that recording has started
+                        recordButton.setBackgroundResource(R.drawable.stop);
+                        isRecording = true;
+                    } else {
+
+                        // If prepare didn't work, release the camera
+                        releaseMediaRecorder();
+                        // Inform user
+                        Toast.makeText(getApplicationContext(),"Some Error Occured",Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        }
+    };
+
+    private View.OnClickListener fileButtonOnClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            if (isRecording){
+                Toast.makeText(Recording.this,"Recording in progress",Toast.LENGTH_SHORT).show();
+            }
+            else{
+                Intent intent = new Intent(Recording.this, FilePicker.class);
+                startActivity(intent);
+            }
+        }
+    };
+
+    private View.OnClickListener aboutButtonOnClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            // Display alert showing usage specifications
+            if (!isRecording){
+                // No corresponding GPX file. Ensure same name, Show alert before quit
+                // Setting Dialog Title
+                AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
+                alertBuilder.setTitle("GPS Video Logger v1.0.0");
+
+                // Setting Dialog Message
+                alertBuilder.setMessage("Video format is mp4" +"\n"+
+                        "GPS track is saved in GPX file format" + "\n" +
+                        "Both files would have the same name" + "\n" +
+                        "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage");
+                // Setting OK Button
+                alertBuilder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                });
+
+                AlertDialog dialog = alertBuilder.create();
+                dialog.show();
+            }
+        }
+    };
+
+
+
+
+
+
+
+
+    //Initialization functions
+
+    private void initialize_camera(){
+        // Create an instance of Camera
+        mCamera = getCameraInstance();
+
+        //Setting orientation of camera
+        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        mCamera.setDisplayOrientation(result);
+
+        // Create our Preview view and set it as the content of our activity.
+        mPreview = new CameraPreview(this, mCamera);
+        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
+        preview.addView(mPreview);
+
+        //Finding back-camera id
+        cameraId = getBackCameraID();
+
+    }
+
+
+    private void initialize_app_folder(){
+        //Check for app folder
+        File folder = new File(Environment.getExternalStorageDirectory() +
+                File.separator + "GPS_Video_Logger");
+        if (!folder.exists()) {
+            //Handle error in making folder
+            boolean success = folder.mkdir();
+            Log.d("Folder-Creation",Boolean.toString(success));
+        }
+    }
+
+    private void initialize_location(){
+        //Initialising location provider
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        //Setting up location request objects
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setInterval(500);
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+    }
+
+
+
+
 
 
     // Configure MediaRecorder
@@ -339,6 +379,7 @@ public class Recording extends AppCompatActivity{
 
 
 
+
     // Camera Utility functions
 
     private int getBackCameraID(){
@@ -378,6 +419,11 @@ public class Recording extends AppCompatActivity{
         }
     }
 
+    private void stopPreview(){
+        if (mCamera != null)
+            mCamera.stopPreview();
+    }
+
     private void releaseCamera(){
         if (mCamera != null){
             mCamera.stopPreview();
@@ -385,8 +431,6 @@ public class Recording extends AppCompatActivity{
             mCamera = null;
         }
     }
-
-
 
 
     // Utitliy function to get camera orientation based on device orientation
@@ -415,9 +459,13 @@ public class Recording extends AppCompatActivity{
         }
         return result;
     }
-    
 
 
+
+
+
+
+    //GPX file handling functions
 
     // Create gpx file
     private void  create_gpx_file(String filename){
@@ -503,7 +551,11 @@ public class Recording extends AppCompatActivity{
         }
     }
 
-    
+
+
+
+
+    //Location Related functions
     private LocationCallback mLocationCallback = new LocationCallback() {
         @Override
         public void onLocationResult(LocationResult locationResult) {
@@ -525,36 +577,14 @@ public class Recording extends AppCompatActivity{
 
 
 
-    
-    // Utility functions for checking permissions
+
+
+    // Utility functions for checking if location is enabled
 
     private boolean isLocationEnabled(){
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-    }
-
-
-    private boolean checkPermissions(){
-
-        if( ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(this,Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ){
-            return true;
-        }
-        return false;
-    }
-
-
-    private void requestPermissions(){
-        ActivityCompat.requestPermissions(
-                this,
-                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE },
-                PERMISSION_ID
-        );
     }
 
 }

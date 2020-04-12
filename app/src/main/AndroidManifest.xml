@@ -29,14 +29,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity
-            android:name="com.example.gps_video_logger.FilePicker"
-            android:label="@string/title_activity_file_picker"
-            android:screenOrientation="portrait"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
-        <activity
-            android:name="com.example.gps_video_logger.Recording"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+        <activity android:name=".LauncherActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -44,8 +37,17 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="com.example.gps_video_logger.MainActivity"
-            android:screenOrientation="portrait"></activity>
+            android:name=".FilePicker"
+            android:label="@string/title_activity_file_picker"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".Recording"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+        </activity>
+        <activity
+            android:name=".PlaybackActivity"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>
