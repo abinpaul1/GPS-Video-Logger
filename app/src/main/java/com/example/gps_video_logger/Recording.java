@@ -250,7 +250,8 @@ public class Recording extends AppCompatActivity{
                         "GPS track is saved in GPX file format" + "\n" +
                         "Both files would have the same name" + "\n" +
                         "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
-                        "Swipe to delete video file");
+                        "Swipe to delete video file" + "\n" +
+                        "Long press to rename videos");
                 // Setting OK Button
                 alertBuilder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {

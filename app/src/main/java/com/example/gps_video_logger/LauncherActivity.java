@@ -28,7 +28,7 @@ public class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+//        overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
         setContentView(R.layout.activity_launcher);
 
         permission_denied_text = (TextView) findViewById(R.id.permission_text);
@@ -46,7 +46,7 @@ public class LauncherActivity extends AppCompatActivity {
                     startActivity(intent);
                     finish();
                 }
-            }, 350);
+            }, 200);
         }
     }
 
