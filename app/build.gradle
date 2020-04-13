@@ -32,4 +32,6 @@ dependencies {
     implementation 'org.osmdroid:osmdroid-android:6.1.5'
     implementation 'de.hdodenhof:circleimageview:3.1.0'
     implementation "androidx.cardview:cardview:1.0.0"
+    api 'io.ticofab.androidgpxparser:parser:1.6.0'
+    implementation 'net.danlew:android.joda:2.10.3'
 }

@@ -86,7 +86,7 @@ public class Recording extends AppCompatActivity{
 
 
         //Setting the time format
-        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SS'Z'");
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 
 
@@ -307,10 +307,11 @@ public class Recording extends AppCompatActivity{
         //Initialising location provider
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
+
         //Setting up location request objects
         mLocationRequest = new LocationRequest();
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(500);
+        mLocationRequest.setInterval(1000);
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
     }
 
@@ -507,16 +508,15 @@ public class Recording extends AppCompatActivity{
 
 
     // Update provided location data into gpx file
-    private void update_location_gpx(Double Latitude, Double Longitude){
+    private void update_location_gpx(Double Latitude, Double Longitude, Double Altitude){
         try {
             serializer.startTag(null, "trkpt");
             serializer.attribute(null,"lat", Double.toString(Latitude));
             serializer.attribute(null,"lon", Double.toString(Longitude));
 
             serializer.startTag(null,"ele");
-            serializer.text("0.000000");
+            serializer.text(Double.toString(Altitude));
             serializer.endTag(null,"ele");
-
             serializer.startTag(null,"time");
 
             String time = sdf.format(System.currentTimeMillis());
@@ -563,7 +563,8 @@ public class Recording extends AppCompatActivity{
         public void onLocationResult(LocationResult locationResult) {
             Location mLastLocation = locationResult.getLastLocation();
             //Write location to GPX file
-            update_location_gpx(mLastLocation.getLatitude(),mLastLocation.getLongitude());
+            Log.d("Accuracy",Float.toString(mLastLocation.getAccuracy()));
+            update_location_gpx(mLastLocation.getLatitude(),mLastLocation.getLongitude(),mLastLocation.getAltitude());
         }
     };
 
@@ -585,6 +586,9 @@ public class Recording extends AppCompatActivity{
 
     private boolean isLocationEnabled(){
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        // Logging if altitude data is supported by GPS on phone
+        Log.d("Altitude available", Boolean.toString(locationManager.getProvider(LocationManager.GPS_PROVIDER).supportsAltitude()));
 
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
     }

@@ -23,21 +23,24 @@ import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.overlay.Marker;
-import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.text.ParsePosition;
-import java.text.SimpleDateFormat;
 
-import java.util.TimeZone;
+import java.util.List;
+import java.util.ListIterator;
 
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.views.MapView;
 
+import io.ticofab.androidgpxparser.parser.GPXParser;
+import io.ticofab.androidgpxparser.parser.domain.Gpx;
+import io.ticofab.androidgpxparser.parser.domain.Track;
+import io.ticofab.androidgpxparser.parser.domain.TrackPoint;
+import io.ticofab.androidgpxparser.parser.domain.TrackSegment;
 
 
 public class PlaybackActivity extends AppCompatActivity {
@@ -51,11 +54,12 @@ public class PlaybackActivity extends AppCompatActivity {
     long current_delay = 500;
     long prev_time;
 
-    SimpleDateFormat sdf;
-
     FileInputStream fis;
     XmlPullParserFactory factory;
-    XmlPullParser gpx_parser;
+    
+    GPXParser parser;
+    Gpx gpx_parsed;
+    ListIterator<TrackPoint> gpxTrackPoints;
 
     MapView map = null;
     IMapController mapController;
@@ -75,14 +79,12 @@ public class PlaybackActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
 
+        //Initializing GPX parser
+        parser = new GPXParser();
+
         //Get filename of file to play
         Intent intent = getIntent();
         filename = intent.getStringExtra("filename");
-
-        //Setting time format
-        sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-
 
 //        Load/initialize the osmdroid configuration, this can be done
 //        setting this before the layout is inflated is a good idea
@@ -172,77 +174,32 @@ public class PlaybackActivity extends AppCompatActivity {
         Log.d("Fileo",Environment.getExternalStorageDirectory() +
                 File.separator + "GPS_Video_Logger" + "/" + gpx_filename);
 
-        //Opening file and setting factory
         try {
             fis = new FileInputStream(new File( Environment.getExternalStorageDirectory() +
                     File.separator + "GPS_Video_Logger", gpx_filename));
-            factory = XmlPullParserFactory.newInstance();
-            factory.setNamespaceAware(false);
-        }
-        catch (IOException | XmlPullParserException e){
+            gpx_parsed = parser.parse(fis);
+        } catch (IOException | XmlPullParserException e) {
             e.printStackTrace();
             display_error_and_quit(GPX_FILE_NOT_FOUND);
             return false;
         }
 
-
-        //Linking input xml and parser
-        try {
-            gpx_parser = factory.newPullParser();
-            gpx_parser.setInput(fis, null);
-        }
-        catch (XmlPullParserException e){
-            e.printStackTrace();
-            display_error_and_quit(GPX_FILE_NOT_FOUND);
-            return false;
-        }
-
-        int test_event = -1;
-        //Parsing till trkpt
-        try {
-            int eventType = gpx_parser.getEventType();
-
-            while (true) {
-                if (eventType == XmlPullParser.START_TAG){
-                    if (gpx_parser.getName().equals("trkseg")){
-                        break;
-                    }
-                    else
-                        gpx_parser.getName();
-                }
-                else if (eventType == XmlPullParser.END_TAG) {
-                    gpx_parser.getName();
-                }
-                else if (eventType == XmlPullParser.TEXT) {
-                    gpx_parser.getText();
-                }
-
-                eventType = gpx_parser.next();
-            }
-
-
-            eventType = gpx_parser.next();
-            if(eventType == XmlPullParser.END_TAG){
-                Log.d("Eventtype",gpx_parser.getName());
-                if (gpx_parser.getName().equals("trkseg")){
-                    display_error_and_quit(EMPTY_GPX_FILE);
-                    return false;
+        
+        // We support playback of first segment of first track only
+        if (gpx_parsed!=null){
+            List<Track> tracks = gpx_parsed.getTracks();
+            List<TrackSegment> trackSegments;
+            if (tracks.size()>0) {
+                trackSegments = tracks.get(0).getTrackSegments();
+                if (trackSegments.size() > 0) {
+                    gpxTrackPoints = trackSegments.get(0).getTrackPoints().listIterator();
+                    return true;
                 }
             }
-            else{
-                test_event = gpx_parser.next();
-                Log.d("Eventtype",Integer.toString(test_event)+gpx_parser.getName());
-            }
-
         }
-        catch (IOException | XmlPullParserException e){
-            e.printStackTrace();
-            //Invalid GPX file
-            display_error_and_quit(INVALID_GPX_FILE);
-            return false;
-        }
-
-        return true;
+        
+        display_error_and_quit(INVALID_GPX_FILE);
+        return false;
     }
 
 
@@ -271,7 +228,7 @@ public class PlaybackActivity extends AppCompatActivity {
     // Function to begin playing of video and gps data
     private void start_playback(){
 
-           if(!mVideoView.isPlaying() && gpx_parser==null){
+           if(!mVideoView.isPlaying() && gpx_parsed==null){
 
                if(open_gpx_read()){
                    play = true;
@@ -304,7 +261,7 @@ public class PlaybackActivity extends AppCompatActivity {
 
     private void stop_gps_playback(){
         play = false;
-        gpx_parser = null;
+        gpx_parsed = null;
         factory = null;
     }
 
@@ -326,67 +283,24 @@ public class PlaybackActivity extends AppCompatActivity {
     //Get next location from currently open gpx file
     private GeoPoint get_next_location(){
 
-        try{
-            if(gpx_parser.getName().equals("trkseg")){
-                return null;
-            }
-        }
-        catch(NullPointerException e){
-            // Some problem in GPX file
-            e.printStackTrace();
-//            display_error_and_quit(INVALID_GPX_FILE);
-            Toast.makeText(PlaybackActivity.this,"Invalid gpx file",Toast.LENGTH_SHORT).show();
-            finish();
-        }
+        TrackPoint current_track;
+        if (gpxTrackPoints.hasNext())
+            current_track = gpxTrackPoints.next();
+        else
+            return null;
 
 
-
-        Double Latitude =  Double.parseDouble(gpx_parser.getAttributeValue(null,"lat"));
-        Double Longitude = Double.parseDouble(gpx_parser.getAttributeValue(null,"lon"));
+        Double Latitude =  current_track.getLatitude();
+        Double Longitude = current_track.getLongitude();
         GeoPoint nextGeoPoint = new GeoPoint(Latitude,Longitude);
 
-        try {
-            gpx_parser.next();
-            gpx_parser.getText();//blank
-            gpx_parser.next();
-            gpx_parser.getName();//ele
-            gpx_parser.next();
-            gpx_parser.getText();//ele value
-            gpx_parser.next();
-            gpx_parser.getName();//ele close
-            gpx_parser.next();
-            gpx_parser.getText();//Blank
-            gpx_parser.next();
-            gpx_parser.getName();//Time
-            gpx_parser.next();
-
-            //Updating time to wait before fetching next location from gpx file
-            long new_time = sdf.parse(gpx_parser.getText(),new ParsePosition(0)).getTime();
-            Log.d("time",Long.toString(new_time));
-            Log.d("time",Long.toString(prev_time));
-            current_delay =  new_time - prev_time; //Time value
-            prev_time = new_time;
-            Log.d("time",Long.toString(current_delay));
-
-
-            gpx_parser.next();
-            gpx_parser.getName();//Time close
-            gpx_parser.next();
-            gpx_parser.getText();//Blank
-
-            gpx_parser.next();
-            gpx_parser.getName();// trkpt close
-            gpx_parser.next();
-            gpx_parser.getText();//Blank
-
-            gpx_parser.next();
-            gpx_parser.getName();//new trkpt
-
-        }
-        catch (IOException | XmlPullParserException e){
-            display_error_and_quit(INVALID_GPX_FILE);
-            e.printStackTrace();
-        }
+        //Updating time to wait before fetching next location from gpx file
+        long new_time = current_track.getTime().getMillis();
+        Log.d("time",Long.toString(new_time));
+        Log.d("time",Long.toString(prev_time));
+        current_delay =  new_time - prev_time; //Time value
+        prev_time = new_time;
+        Log.d("time",Long.toString(current_delay));
 
         return nextGeoPoint;
     }
