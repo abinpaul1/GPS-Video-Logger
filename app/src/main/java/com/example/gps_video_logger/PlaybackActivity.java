@@ -23,6 +23,7 @@ import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.Polyline;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -30,6 +31,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -59,7 +63,8 @@ public class PlaybackActivity extends AppCompatActivity {
     
     GPXParser parser;
     Gpx gpx_parsed;
-    ListIterator<TrackPoint> gpxTrackPoints;
+    ListIterator<TrackPoint> gpxTrackPointsIterator;
+    List<TrackPoint> gpxTrackPoints;
 
     MapView map = null;
     IMapController mapController;
@@ -192,7 +197,8 @@ public class PlaybackActivity extends AppCompatActivity {
             if (tracks.size()>0) {
                 trackSegments = tracks.get(0).getTrackSegments();
                 if (trackSegments.size() > 0) {
-                    gpxTrackPoints = trackSegments.get(0).getTrackPoints().listIterator();
+                    gpxTrackPoints = trackSegments.get(0).getTrackPoints();
+                    gpxTrackPointsIterator = gpxTrackPoints.listIterator();
                     return true;
                 }
             }
@@ -233,6 +239,7 @@ public class PlaybackActivity extends AppCompatActivity {
                if(open_gpx_read()){
                    play = true;
 
+                   draw_track();
                    start_video_playback();
                    //Update to initial position
                    update_map();
@@ -280,12 +287,31 @@ public class PlaybackActivity extends AppCompatActivity {
     }
 
 
+
+    private void draw_track(){
+
+        Polyline line = new Polyline(map);
+        line.setWidth(20f);
+        List<GeoPoint> pts = new ArrayList<>();
+
+        for (int i =0; i< gpxTrackPoints.size(); ++i){
+            Double lat = gpxTrackPoints.get(i).getLatitude();
+            Double lon = gpxTrackPoints.get(i).getLongitude();
+            pts.add(new GeoPoint(lat,lon));
+        }
+
+        line.setPoints(pts);
+        map.getOverlayManager().add(line);
+    }
+
+
+
     //Get next location from currently open gpx file
     private GeoPoint get_next_location(){
 
         TrackPoint current_track;
-        if (gpxTrackPoints.hasNext())
-            current_track = gpxTrackPoints.next();
+        if (gpxTrackPointsIterator.hasNext())
+            current_track = gpxTrackPointsIterator.next();
         else
             return null;
 

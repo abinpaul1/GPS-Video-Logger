@@ -85,6 +85,14 @@ public class FilePicker extends AppCompatActivity {
             }
         });
 
+        alertBuilder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                mAdapter.notifyItemChanged(position);
+                dialog.dismiss();
+            }
+        });
+
         AlertDialog dialog = alertBuilder.create();
         dialog.show();
 

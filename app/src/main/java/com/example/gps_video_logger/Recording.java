@@ -10,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.TimeZone;
 
 import android.annotation.SuppressLint;
@@ -186,7 +187,7 @@ public class Recording extends AppCompatActivity{
 
             } else {
 
-                filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-hh-mm-ss").format(new Date());
+                filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
 
                 //Check if location is enabled
                 if(!isLocationEnabled()){
@@ -508,14 +509,14 @@ public class Recording extends AppCompatActivity{
 
 
     // Update provided location data into gpx file
-    private void update_location_gpx(Double Latitude, Double Longitude, Double Altitude){
+    private void update_location_gpx(Location location){
         try {
             serializer.startTag(null, "trkpt");
-            serializer.attribute(null,"lat", Double.toString(Latitude));
-            serializer.attribute(null,"lon", Double.toString(Longitude));
+            serializer.attribute(null,"lat", Double.toString(location.getLatitude()));
+            serializer.attribute(null,"lon", Double.toString(location.getLongitude()));
 
             serializer.startTag(null,"ele");
-            serializer.text(Double.toString(Altitude));
+            serializer.text(Double.toString(location.getAltitude()));
             serializer.endTag(null,"ele");
             serializer.startTag(null,"time");
 
@@ -561,10 +562,12 @@ public class Recording extends AppCompatActivity{
     private LocationCallback mLocationCallback = new LocationCallback() {
         @Override
         public void onLocationResult(LocationResult locationResult) {
-            Location mLastLocation = locationResult.getLastLocation();
+            List<Location> all = locationResult.getLocations();
+            Log.d("Number of loations",Integer.toString(all.size()));
+            Location mLastLocation = all.get(0);
             //Write location to GPX file
             Log.d("Accuracy",Float.toString(mLastLocation.getAccuracy()));
-            update_location_gpx(mLastLocation.getLatitude(),mLastLocation.getLongitude(),mLastLocation.getAltitude());
+            update_location_gpx(mLastLocation);
         }
     };
 
