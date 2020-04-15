@@ -10,47 +10,48 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
 import java.util.TimeZone;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.hardware.Camera;
+import android.location.GpsStatus;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Xml;
 import android.view.Surface;
 import android.view.View;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
 
 import org.xmlpull.v1.XmlSerializer;
 
 public class Recording extends AppCompatActivity{
 
-    
+
+    //Msg codes;
+    private static final int INSTRUCTIONS = 1;
+    private static final int FIX_PENDING = 2;
+    private static final int FIX_INFO = 3;
+
+
     //Constants
     private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
     private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
-
+    long FREQUENCY = 1000; //milli sec
 
     private String filename;
 
@@ -59,19 +60,26 @@ public class Recording extends AppCompatActivity{
     CameraPreview mPreview;
     MediaRecorder mediaRecorder;
 
-    FusedLocationProviderClient mFusedLocationClient;
     FileOutputStream fos;
     XmlSerializer serializer;
     SimpleDateFormat sdf;
-    LocationRequest mLocationRequest;
+
+    private LocationManager mlocManager = null;
+    private boolean isGPSLocationUpdatesActive = false;
+    private long mLastLocationMillis;
+    private boolean hasGPSFix = false;
+    Location mLastLocation = null;
+
 
     Button recordButton;
     boolean isRecording = false;
 
     Button fileButton;
-
     Button aboutButton;
 
+    // Imageview doesn't display tick because of issue with resolution-- bitmap issue most rpob
+    Button tickView;
+    Button mProgressBar;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -96,6 +104,9 @@ public class Recording extends AppCompatActivity{
         fileButton = (Button) findViewById(R.id.files_button);
         aboutButton = (Button) findViewById(R.id.about_button);
 
+        //GPS fix status progress bar
+        tickView = (Button) findViewById(R.id.tickView);
+        mProgressBar = (Button) findViewById(R.id.progressBar);
 
         //Toggling record button to start and stop recording
         recordButton.setOnClickListener(recordButtonOnClickListener);
@@ -106,6 +117,9 @@ public class Recording extends AppCompatActivity{
         // Help/About Button
         aboutButton.setOnClickListener(aboutButtonOnClickListener);
 
+        mProgressBar.setOnClickListener(GpsFixListener);
+        tickView.setOnClickListener(GpsFixListener);
+
         initialize_app_folder();
         initialize_camera();
         initialize_location();
@@ -115,7 +129,7 @@ public class Recording extends AppCompatActivity{
     protected void onPause() {
         super.onPause();
         releaseMediaRecorder();       // if you are using MediaRecorder, release it first
-        mFusedLocationClient.removeLocationUpdates(mLocationCallback); //Stop location updates
+        setGPSLocationUpdates(false); //Stop location updates
         finish_gpx_file();
         stopPreview();
         recordButton.setBackgroundResource(R.drawable.rec);
@@ -126,6 +140,8 @@ public class Recording extends AppCompatActivity{
     @Override
     protected void onResume() {
         super.onResume();
+        //Restart location updates
+        setGPSLocationUpdates(true);
         // Create an instance of Camera
         mCamera = getCameraInstance();
 
@@ -133,9 +149,10 @@ public class Recording extends AppCompatActivity{
         int result = getCameraDisplayOrientation(this, cameraId, mCamera);
         mCamera.setDisplayOrientation(result);
 
+
+        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
         // Create our Preview view and set it as the content of our activity.
         mPreview = new CameraPreview(this, mCamera);
-        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
         preview.addView(mPreview);
     }
 
@@ -175,7 +192,6 @@ public class Recording extends AppCompatActivity{
                 mediaRecorder.stop();  // stop the recording
 
                 //Close GPX File
-                mFusedLocationClient.removeLocationUpdates(mLocationCallback);
                 finish_gpx_file();
 
                 releaseMediaRecorder(); // release the MediaRecorder object
@@ -184,7 +200,7 @@ public class Recording extends AppCompatActivity{
                 // Inform the user that recording has stopped
                 recordButton.setBackgroundResource(R.drawable.rec);
                 isRecording = false;
-
+                setGPSFixSpinner(); // Again display GPS fix status
             } else {
 
                 filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
@@ -196,27 +212,35 @@ public class Recording extends AppCompatActivity{
 
                 }
                 else{
-                    // Initialize video camera
-                    if (prepareVideoRecorder()) {
 
-                        // Camera is available and unlocked, MediaRecorder is prepared,
-                        // now you can start recording
-                        mediaRecorder.start();
+                    if (hasGPSFix) {
+                        // Initialize video camera
+                        if (prepareVideoRecorder()) {
 
-                        //Create new GPX file and start recording location data
-                        create_gpx_file(filename+".gpx");
-                        recordLocationData();
+                            // Camera is available and unlocked, MediaRecorder is prepared,
+                            // now you can start recording
+                            mediaRecorder.start();
 
+                            //Create new GPX file and start recording location data
+                            create_gpx_file(filename + ".gpx");
+                            isRecording = true;
 
-                        // Inform the user that recording has started
-                        recordButton.setBackgroundResource(R.drawable.stop);
-                        isRecording = true;
-                    } else {
+                            // Inform the user that recording has started
+                            recordButton.setBackgroundResource(R.drawable.stop);
+//                            //Hide GPS fix status spinner while recording after integrating map matching
+//                            mProgressBar.setVisibility(View.INVISIBLE);
+//                            tickView.setVisibility(View.INVISIBLE);
 
-                        // If prepare didn't work, release the camera
-                        releaseMediaRecorder();
-                        // Inform user
-                        Toast.makeText(getApplicationContext(),"Some Error Occured",Toast.LENGTH_SHORT).show();
+                        } else {
+
+                            // If prepare didn't work, release the camera
+                            releaseMediaRecorder();
+                            // Inform user
+                            Toast.makeText(getApplicationContext(), "Some Error Occured", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    else{
+                        display_alert(FIX_PENDING);
                     }
                 }
             }
@@ -241,30 +265,90 @@ public class Recording extends AppCompatActivity{
         public void onClick(View view) {
             // Display alert showing usage specifications
             if (!isRecording){
-                // No corresponding GPX file. Ensure same name, Show alert before quit
-                // Setting Dialog Title
-                AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
-                alertBuilder.setTitle("GPS Video Logger v1.0.0");
-
-                // Setting Dialog Message
-                alertBuilder.setMessage("Video format is mp4" +"\n"+
-                        "GPS track is saved in GPX file format" + "\n" +
-                        "Both files would have the same name" + "\n" +
-                        "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
-                        "Swipe to delete video file" + "\n" +
-                        "Long press to rename videos");
-                // Setting OK Button
-                alertBuilder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                    }
-                });
-
-                AlertDialog dialog = alertBuilder.create();
-                dialog.show();
+                display_alert(INSTRUCTIONS);
             }
         }
     };
 
+
+    private View.OnClickListener GpsFixListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            display_alert(FIX_INFO);
+        }
+    };
+
+
+    // Location listener
+    //    https://stackoverflow.com/questions/2021176/how-can-i-check-the-current-status-of-the-gps-receiver
+    private LocationListener mlocListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            if (location == null) return;
+            mLastLocation = location;
+            mLastLocationMillis = SystemClock.elapsedRealtime();
+            Log.d("GPS","Loc changed");
+            if (isRecording && hasGPSFix){
+                update_location_gpx(location);
+            }
+        }
+
+        @Override
+        public void onStatusChanged(String s, int i, Bundle bundle) {
+
+        }
+
+        @Override
+        public void onProviderEnabled(String s) {
+
+        }
+
+        @Override
+        public void onProviderDisabled(String s) {
+
+        }
+    };
+
+
+    // GpsStatus Listener
+    //    https://stackoverflow.com/questions/2021176/how-can-i-check-the-current-status-of-the-gps-receiver
+    private GpsStatus.Listener mGpsStatusListener = new GpsStatus.Listener() {
+        @Override
+        public void onGpsStatusChanged(int event) {
+            switch (event) {
+                case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+                    if (mLastLocation != null)
+                    {
+                        if((SystemClock.elapsedRealtime() - mLastLocationMillis) < 5000)
+                        {
+                            if (!hasGPSFix)
+                                Log.i("GPS","Fix Acquired");
+                            setGPSFix(true);
+                        }
+                        else
+                        {
+                            if (hasGPSFix)
+                            {
+                                Log.i("GPS","Fix Lost (expired)");
+                                mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
+                            }
+                            setGPSFix(false);
+                        }
+                    }
+                    break;
+                case GpsStatus.GPS_EVENT_FIRST_FIX:
+                    Log.i("GPS", "First Fix/ Refix");
+                    setGPSFix(true);
+                    break;
+                case GpsStatus.GPS_EVENT_STARTED:
+                    Log.i("GPS", "Started!");
+                    break;
+                case GpsStatus.GPS_EVENT_STOPPED:
+                    Log.i("GPS", "Stopped");
+                    break;
+            }
+        }
+    };
 
 
 
@@ -283,14 +367,15 @@ public class Recording extends AppCompatActivity{
         mCamera.setDisplayOrientation(result);
 
         // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(this, mCamera);
         ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
+        mPreview = new CameraPreview(this, mCamera);
         preview.addView(mPreview);
 
         //Finding back-camera id
         cameraId = getBackCameraID();
 
     }
+
 
 
     private void initialize_app_folder(){
@@ -304,17 +389,63 @@ public class Recording extends AppCompatActivity{
         }
     }
 
+
+
     private void initialize_location(){
-        //Initialising location provider
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        //Initialising location manager
+        mlocManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
 
-        //Setting up location request objects
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(1000);
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        //Setting up location requests
+        setGPSLocationUpdates(true);
+        setGPSFixSpinner();
     }
+
+
+    public void setGPSLocationUpdates(boolean state) {
+        if (!state && !isRecording && isGPSLocationUpdatesActive) {
+            Log.d("GPS","Stopping");
+            mlocManager.removeGpsStatusListener(mGpsStatusListener);
+            mlocManager.removeUpdates(mlocListener);
+            isGPSLocationUpdatesActive = false;
+        }
+        else if (state && !isGPSLocationUpdatesActive) {
+            mlocManager.addGpsStatusListener(mGpsStatusListener);
+
+//            Criteria myCriteria = new Criteria();
+//            myCriteria.setAccuracy(Criteria.ACCURACY_HIGH);
+//            mlocManager.requestLocationUpdates(FREQUENCY, 0, myCriteria, mlocListener, Looper.myLooper());
+            mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
+            isGPSLocationUpdatesActive = true;
+            Log.d("GPS","Started");
+        }
+    }
+
+
+    // Update the spinner based on gps fix
+    private void setGPSFixSpinner(){
+
+        // Notifying users that fix is gone while recording???
+//        if (!isRecording) {
+            if (hasGPSFix) {
+                mProgressBar.clearAnimation();
+                mProgressBar.setVisibility(View.INVISIBLE);
+                tickView.setVisibility(View.VISIBLE);
+            } else {
+                mProgressBar.startAnimation(
+                        AnimationUtils.loadAnimation(this, R.anim.rotate) );
+                mProgressBar.setVisibility(View.VISIBLE);
+                tickView.setVisibility(View.INVISIBLE);
+            }
+//        }
+    }
+
+    private void setGPSFix(boolean state){
+        hasGPSFix = state;
+        setGPSFixSpinner();
+    }
+
+
 
 
 
@@ -555,37 +686,44 @@ public class Recording extends AppCompatActivity{
     }
 
 
+    //Utility function to show alert messages
+    private void display_alert(int msgCode){
 
-
-
-    //Location Related functions
-    private LocationCallback mLocationCallback = new LocationCallback() {
-        @Override
-        public void onLocationResult(LocationResult locationResult) {
-            List<Location> all = locationResult.getLocations();
-            Log.d("Number of loations",Integer.toString(all.size()));
-            Location mLastLocation = all.get(0);
-            //Write location to GPX file
-            Log.d("Accuracy",Float.toString(mLastLocation.getAccuracy()));
-            update_location_gpx(mLastLocation);
+        String msg = "";
+        switch(msgCode){
+            case INSTRUCTIONS:
+                msg = "Video format is mp4" +"\n"+
+                        "GPS track is saved in GPX file format" + "\n" +
+                        "Both files would have the same name" + "\n" +
+                        "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
+                        "Swipe to delete video file" + "\n" +
+                        "Long press to rename videos";
+                break;
+            case FIX_PENDING:
+                msg = "Please wait for the GPS to get a fix on your location." + "\n" +
+                        "GPS Fix can be delayed if you are indoors or surrounded by tall building.";
+                break;
+            case FIX_INFO:
+                msg = "GPS Fix Status" +"\n" +
+                        "A GPS Fix means your device is in view of enough satellites to get a proper lock on your position" + "\n" +
+                        "Even while recording, locations are saved only when a fix is present";
         }
-    };
+
+        // No corresponding GPX file. Ensure same name, Show alert before quit
+        // Setting Dialog Title
+        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
+        alertBuilder.setTitle("GPS Video Logger v1.0.0");
+
+        // Setting Dialog Message
+        alertBuilder.setMessage(msg);
 
 
-    // Function for getting and recording new location into gpx file
-    @SuppressLint("MissingPermission")
-    private void recordLocationData(){
-        mFusedLocationClient.requestLocationUpdates(
-                mLocationRequest, mLocationCallback,
-                Looper.myLooper()
-        );
+        AlertDialog dialog = alertBuilder.create();
+        dialog.show();
     }
 
 
-
-
-
-    // Utility functions for checking if location is enabled
+    // Utility function for checking if location is enabled
 
     private boolean isLocationEnabled(){
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);

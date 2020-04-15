@@ -342,7 +342,7 @@ public class PlaybackActivity extends AppCompatActivity {
         else if (msg == GPX_FILE_NOT_FOUND)
             err_msg = "GPX file not Found! If you copied a new file into the app folder, ensure the video file and GPX file have the same name.";
         else if (msg == EMPTY_GPX_FILE)
-            err_msg = "The GPX file does not have track data. This could happen if you recorded a very short video. You can still access the video file in the app folder.";
+            err_msg = "The GPX file does not have track data. This could happen if you recorded a very short video or GPS fix was lost after commencing recording. You can still access the video file in the app folder.";
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title

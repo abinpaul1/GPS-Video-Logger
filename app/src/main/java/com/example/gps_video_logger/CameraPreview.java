@@ -69,4 +69,36 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             Log.d("Cam-prev", "Error starting camera preview: " + e.getMessage());
         }
     }
+
+//    Preview Callback to animate rotating progress bar
+//    Additionally requires passing layout to constructor
+//
+//    Camera.PreviewCallback cb = new Camera.PreviewCallback() {
+//        @Override
+//        public void onPreviewFrame(byte[] bytes, Camera camera) {
+//
+//            if (currentProgress%50==0){
+//                if (actualProgress == 100){
+//                    actualProgress = 1;
+//                    currentProgress = 0;
+//                }
+//                else{
+//                    int ad = currentProgress%50;
+//                    actualProgress+= ad;
+//                }
+//
+//
+//                mLayout.removeView(mProgressBar);
+//                mProgressBar = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleSmall);
+//                mProgressBar.setProgress(actualProgress);
+//                ConstraintSet constraintSet = new ConstraintSet();
+//                ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(35,35);
+//                mLayout.addView(mProgressBar, params);
+//            }
+//
+//            currentProgress+=1;
+//        }
+//
+//    };
+
 }
