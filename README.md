@@ -1,6 +1,8 @@
 # GPS-Video-Logger
 Record and playback video and live location data simultaneously.
 
+<img src = "Screenshots/Launch.png" width ="200" /> <img src = "Screenshots/Camera.png" width ="200" /> <img src = "Screenshots/Journeys.png" width ="200" /> <img src = "Screenshots/Playback.png" width ="200" />
+
 ## Description
 
 GPS Video Logger is a simple Android App to record video and geographical position simultaneously.<br>
@@ -8,8 +10,6 @@ This app is accurate in determining your location and offers two modes of record
 A Drive mode for your car/bike journeys and a Walk mode for your strolls.<br>
 The app provides a video player to view your video and location on map side by side.<br>
 Recorded journeys are stored directly in your Internal Storage (Video as mp4 and track as a GPX file).<br>
-<br>
-The app is 100% Free and Open Source.<br>
 <br>
 The application can be downloaded from this repository.[GPSVideoLogger](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/app/release/app-release.apk)<br>
 It will shortly be made available on Google Play Store.
