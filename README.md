@@ -11,7 +11,7 @@ Recorded journeys are stored directly in your Internal Storage (Video as mp4 and
 <br>
 The app is 100% Free and Open Source.<br>
 <br>
-The application can be downloaded from this repository.[GPSVideoLogger](https://play.google.com/store/apps/details?id=eu.basicairdata.graziano.gpslogger)<br>
+The application can be downloaded from this repository.[GPSVideoLogger](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/app/release/app-release.apk)<br>
 It will shortly be made available on Google Play Store.
 
 
@@ -28,3 +28,5 @@ It will shortly be made available on Google Play Store.
 <b>Q</b> - <i>How can I backup/copy my Journeys?</i><br>
 <b>A</b> - You can see your journey files in the GPS_Video_Logger folder in your Internal Storage. Each journey has a video file in mp4 format and track file(location) in GPX format. Both these files will have the same name (name of your journey). Copy both these files to succesfully copy your journey.
 
+<b>Q</b> - <i>My horizontal videos appear vertical during playback</i><br>
+<b>A</b> - Ensure you have enabled the  "Auto Screen Rotate" feature before starting the recording. 
