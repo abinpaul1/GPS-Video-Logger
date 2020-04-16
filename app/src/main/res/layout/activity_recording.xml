@@ -39,6 +39,17 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
+
+        <Button
+            android:id="@+id/mode_button"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:layout_margin="7.5dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/about_button"
+            app:layout_constraintStart_toEndOf="@id/record_button"/>
+
+
         <Button
             android:id="@+id/progressBar"
             android:layout_width="35dp"

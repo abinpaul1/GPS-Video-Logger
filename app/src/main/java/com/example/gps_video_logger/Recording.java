@@ -3,6 +3,7 @@ package com.example.gps_video_logger;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.content.ContextCompat;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,10 +13,12 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.hardware.Camera;
 import android.location.GpsStatus;
@@ -51,7 +54,13 @@ public class Recording extends AppCompatActivity{
     //Constants
     private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
     private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
-    long FREQUENCY = 1000; //milli sec
+
+    private static final long DRIVE_FREQUENCY = 1000;
+    private static final long WALK_FREQUENCY = 4000;
+    private static final int DRIVE = 1;
+    private static final int WALK = 2;
+    long FREQUENCY; //milli sec
+    int mode;
 
     private String filename;
 
@@ -80,6 +89,8 @@ public class Recording extends AppCompatActivity{
     // Imageview doesn't display tick because of issue with resolution-- bitmap issue most rpob
     Button tickView;
     Button mProgressBar;
+
+    Button modeButton;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -119,6 +130,11 @@ public class Recording extends AppCompatActivity{
 
         mProgressBar.setOnClickListener(GpsFixListener);
         tickView.setOnClickListener(GpsFixListener);
+
+        modeButton = findViewById(R.id.mode_button);
+        modeButton.setOnClickListener(modeChangeListener);
+        set_mode(DRIVE);
+
 
         initialize_app_folder();
         initialize_camera();
@@ -227,9 +243,10 @@ public class Recording extends AppCompatActivity{
 
                             // Inform the user that recording has started
                             recordButton.setBackgroundResource(R.drawable.stop);
-//                            //Hide GPS fix status spinner while recording after integrating map matching
-//                            mProgressBar.setVisibility(View.INVISIBLE);
-//                            tickView.setVisibility(View.INVISIBLE);
+
+//                            //Hide GPS fix status spinner while recording
+                            mProgressBar.setVisibility(View.INVISIBLE);
+                            tickView.setVisibility(View.INVISIBLE);
 
                         } else {
 
@@ -275,6 +292,20 @@ public class Recording extends AppCompatActivity{
         @Override
         public void onClick(View view) {
             display_alert(FIX_INFO);
+        }
+    };
+
+
+    private View.OnClickListener modeChangeListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            Log.d("Mode","Change requested"+Integer.toString(mode));
+            if (!isRecording){
+                if (mode == DRIVE)
+                    set_mode(WALK);
+                else if (mode == WALK)
+                    set_mode(DRIVE);
+            }
         }
     };
 
@@ -353,6 +384,26 @@ public class Recording extends AppCompatActivity{
 
 
 
+    // Set mode :- Drive or walk mode
+    private void set_mode(int new_mode){
+        switch (new_mode){
+            case DRIVE:
+                FREQUENCY = DRIVE_FREQUENCY;
+                modeButton.setBackgroundResource(R.drawable.drive);
+                mode = DRIVE;
+                updateLocationFreq(FREQUENCY);
+                Log.d("Mode","Drive");
+                break;
+            case WALK:
+                FREQUENCY = WALK_FREQUENCY;
+                modeButton.setBackgroundResource(R.drawable.walk);
+                mode = WALK;
+                updateLocationFreq(FREQUENCY);
+                Log.d("Mode","Walk");
+                break;
+        }
+    }
+
 
 
 
@@ -403,21 +454,37 @@ public class Recording extends AppCompatActivity{
 
 
     public void setGPSLocationUpdates(boolean state) {
-        if (!state && !isRecording && isGPSLocationUpdatesActive) {
-            Log.d("GPS","Stopping");
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+        {
+
+            if (!state && !isRecording && isGPSLocationUpdatesActive) {
+                Log.d("GPS", "Stopping");
+                mlocManager.removeGpsStatusListener(mGpsStatusListener);
+                mlocManager.removeUpdates(mlocListener);
+                isGPSLocationUpdatesActive = false;
+            } else if (state && !isGPSLocationUpdatesActive) {
+
+                mlocManager.addGpsStatusListener(mGpsStatusListener);
+                mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
+                isGPSLocationUpdatesActive = true;
+                Log.d("GPS", "Started");
+            }
+
+        }
+    }
+
+
+    private void updateLocationFreq(long frequency){
+        if (isGPSLocationUpdatesActive
+                && (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED))
+        {
+            //Log.w("myApp", "[#] GPSApplication.java - updateGPSLocationFrequency");
             mlocManager.removeGpsStatusListener(mGpsStatusListener);
             mlocManager.removeUpdates(mlocListener);
-            isGPSLocationUpdatesActive = false;
-        }
-        else if (state && !isGPSLocationUpdatesActive) {
-            mlocManager.addGpsStatusListener(mGpsStatusListener);
 
-//            Criteria myCriteria = new Criteria();
-//            myCriteria.setAccuracy(Criteria.ACCURACY_HIGH);
-//            mlocManager.requestLocationUpdates(FREQUENCY, 0, myCriteria, mlocListener, Looper.myLooper());
-            mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
-            isGPSLocationUpdatesActive = true;
-            Log.d("GPS","Started");
+            mlocManager.addGpsStatusListener(mGpsStatusListener);
+            mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, 0, mlocListener);
         }
     }
 
@@ -697,7 +764,8 @@ public class Recording extends AppCompatActivity{
                         "Both files would have the same name" + "\n" +
                         "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
                         "Swipe to delete video file" + "\n" +
-                        "Long press to rename videos";
+                        "Long press to rename videos" + "\n" +
+                        "Drive mode records location every second whereas walk mode records every 4 seconds";
                 break;
             case FIX_PENDING:
                 msg = "Please wait for the GPS to get a fix on your location." + "\n" +
