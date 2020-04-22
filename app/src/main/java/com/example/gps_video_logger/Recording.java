@@ -17,6 +17,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -82,6 +83,7 @@ public class Recording extends AppCompatActivity{
 
     Button recordButton;
     boolean isRecording = false;
+    boolean forceRec = false;
 
     Button fileButton;
     Button aboutButton;
@@ -145,19 +147,24 @@ public class Recording extends AppCompatActivity{
     protected void onPause() {
         super.onPause();
         releaseMediaRecorder();       // if you are using MediaRecorder, release it first
-        setGPSLocationUpdates(false); //Stop location updates
         finish_gpx_file();
         stopPreview();
         recordButton.setBackgroundResource(R.drawable.rec);
         isRecording = false;
+        forceRec = false;
     }
 
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        setGPSLocationUpdates(false);
+    }
 
     @Override
     protected void onResume() {
         super.onResume();
         //Restart location updates
-        setGPSLocationUpdates(true);
         // Create an instance of Camera
         mCamera = getCameraInstance();
 
@@ -203,26 +210,11 @@ public class Recording extends AppCompatActivity{
         @Override
         public void onClick(View v) {
             if (isRecording) {
-
-                // stop recording and release camera
-                mediaRecorder.stop();  // stop the recording
-
-                //Close GPX File
-                finish_gpx_file();
-
-                releaseMediaRecorder(); // release the MediaRecorder object
-                mCamera.lock();         // take camera access back from MediaRecorder
-
-                // Inform the user that recording has stopped
-                recordButton.setBackgroundResource(R.drawable.rec);
-                isRecording = false;
-                setGPSFixSpinner(); // Again display GPS fix status
+                stop_rec_and_release();
             } else {
-
-                filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
-
                 //Check if location is enabled
                 if(!isLocationEnabled()){
+                    Toast.makeText(getApplicationContext(),"Ensure location mode is set to High Accuracy",Toast.LENGTH_LONG).show();
                     Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                     startActivity(intent);
 
@@ -230,34 +222,38 @@ public class Recording extends AppCompatActivity{
                 else{
 
                     if (hasGPSFix) {
-                        // Initialize video camera
-                        if (prepareVideoRecorder()) {
-
-                            // Camera is available and unlocked, MediaRecorder is prepared,
-                            // now you can start recording
-                            mediaRecorder.start();
-
-                            //Create new GPX file and start recording location data
-                            create_gpx_file(filename + ".gpx");
-                            isRecording = true;
-
-                            // Inform the user that recording has started
-                            recordButton.setBackgroundResource(R.drawable.stop);
-
-//                            //Hide GPS fix status spinner while recording
-                            mProgressBar.setVisibility(View.INVISIBLE);
-                            tickView.setVisibility(View.INVISIBLE);
-
-                        } else {
-
-                            // If prepare didn't work, release the camera
-                            releaseMediaRecorder();
-                            // Inform user
-                            Toast.makeText(getApplicationContext(), "Some Error Occured", Toast.LENGTH_SHORT).show();
-                        }
+                        prepare_and_start_rec();
                     }
                     else{
-                        display_alert(FIX_PENDING);
+                        // Display option for force recording
+                        // Setting Dialog Title
+                        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
+                        alertBuilder.setTitle("Force Record");
+                        String msg = "GPS is yet to get a fix on your location." + "\n" +
+                                "GPS Fix can be delayed if you are indoors or surrounded by tall building." + "\n" +
+                                "Recording without a fix may result in points with less accuracy." + "\n" +
+                                "It is highly recommended you wait for a GPS fix";
+                        // Setting Dialog Message
+                        alertBuilder.setMessage(msg);
+
+                        alertBuilder.setPositiveButton("Proceed", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                forceRec = true;
+                                prepare_and_start_rec();
+                            }
+                        });
+
+                        alertBuilder.setNegativeButton("Wait", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                dialogInterface.dismiss();
+                            }
+                        });
+
+
+                        AlertDialog dialog = alertBuilder.create();
+                        dialog.show();
                     }
                 }
             }
@@ -310,6 +306,57 @@ public class Recording extends AppCompatActivity{
     };
 
 
+    //Recording start and stop functions
+    private void prepare_and_start_rec(){
+
+        filename = "REC-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
+
+        // Initialize video camera
+        if (prepareVideoRecorder()) {
+
+            // Camera is available and unlocked, MediaRecorder is prepared,
+            // now you can start recording
+            mediaRecorder.start();
+
+            //Create new GPX file and start recording location data
+            create_gpx_file(filename + ".gpx");
+            isRecording = true;
+
+            // Inform the user that recording has started
+            recordButton.setBackgroundResource(R.drawable.stop);
+
+//                            //Hide GPS fix status spinner while recording
+            mProgressBar.setVisibility(View.INVISIBLE);
+            tickView.setVisibility(View.INVISIBLE);
+
+        } else {
+
+            // If prepare didn't work, release the camera
+            releaseMediaRecorder();
+            // Inform user
+            Toast.makeText(getApplicationContext(), "Some Error Occured", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+    private void stop_rec_and_release(){
+
+        // stop recording and release camera
+        mediaRecorder.stop();  // stop the recording
+
+        //Close GPX File
+        finish_gpx_file();
+
+        releaseMediaRecorder(); // release the MediaRecorder object
+        mCamera.lock();         // take camera access back from MediaRecorder
+
+        // Inform the user that recording has stopped
+        recordButton.setBackgroundResource(R.drawable.rec);
+        isRecording = false;
+        setGPSFixSpinner(); // Again display GPS fix status
+    }
+
+
     // Location listener
     //    https://stackoverflow.com/questions/2021176/how-can-i-check-the-current-status-of-the-gps-receiver
     private LocationListener mlocListener = new LocationListener() {
@@ -319,7 +366,7 @@ public class Recording extends AppCompatActivity{
             mLastLocation = location;
             mLastLocationMillis = SystemClock.elapsedRealtime();
             Log.d("GPS","Loc changed");
-            if (isRecording && hasGPSFix){
+            if (isRecording && (hasGPSFix || forceRec)){
                 update_location_gpx(location);
             }
         }
