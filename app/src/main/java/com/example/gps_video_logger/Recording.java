@@ -824,7 +824,7 @@ public class Recording extends AppCompatActivity{
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title
         AlertDialog.Builder alertBuilder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
-        alertBuilder.setTitle("GPS Video Logger v1.0.0");
+        alertBuilder.setTitle("GPS Video Logger "+ getResources().getString(R.string.ver_code));
 
         // Setting Dialog Message
         alertBuilder.setMessage(msg);
