@@ -262,6 +262,11 @@ public class PlaybackActivity extends AppCompatActivity {
                 trackSegments = tracks.get(0).getTrackSegments();
                 if (trackSegments.size() > 0) {
                     gpxTrackPoints = trackSegments.get(0).getTrackPoints();
+                    // Empty GPX file
+                    if(gpxTrackPoints.size()==0) {
+                        display_error_and_quit(EMPTY_GPX_FILE);
+                        return false;
+                    }
                     gpxTrackPointsIterator = gpxTrackPoints.listIterator();
                     start_time = gpxTrackPoints.get(0).getTime().getMillis();
                     end_time = gpxTrackPoints.get(gpxTrackPoints.size()-1).getTime().getMillis();

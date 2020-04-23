@@ -151,7 +151,6 @@ public class Recording extends AppCompatActivity{
         stopPreview();
         recordButton.setBackgroundResource(R.drawable.rec);
         isRecording = false;
-        forceRec = false;
     }
 
 
@@ -353,6 +352,7 @@ public class Recording extends AppCompatActivity{
         // Inform the user that recording has stopped
         recordButton.setBackgroundResource(R.drawable.rec);
         isRecording = false;
+        forceRec = false;
         setGPSFixSpinner(); // Again display GPS fix status
     }
 
