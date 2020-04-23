@@ -832,7 +832,6 @@ public class Recording extends AppCompatActivity{
         // Setting Dialog Message
         alertBuilder.setMessage(msg);
 
-
         AlertDialog dialog = alertBuilder.create();
         dialog.show();
     }

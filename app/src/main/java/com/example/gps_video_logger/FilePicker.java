@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Environment;
-import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -29,7 +28,7 @@ public class FilePicker extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_file_picker);
-        recyclerView = (RecyclerView) findViewById(R.id.fileList);
+        recyclerView = findViewById(R.id.fileList);
 
         // use this setting to improve performance if you know that changes
         // in content do not change the layout size of the RecyclerView

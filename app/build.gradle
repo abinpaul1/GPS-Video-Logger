@@ -34,4 +34,5 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     api 'io.ticofab.androidgpxparser:parser:1.6.0'
     implementation 'net.danlew:android.joda:2.10.3'
+    implementation 'com.minimize.library:seekbar-compat:0.3.0'
 }

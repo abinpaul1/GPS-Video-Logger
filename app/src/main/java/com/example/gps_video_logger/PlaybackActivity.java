@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.PorterDuff;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,8 +16,7 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.widget.SeekBar;
 import android.widget.VideoView;
 
 import org.osmdroid.api.IMapController;
@@ -25,7 +25,6 @@ import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
 import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -56,13 +55,16 @@ public class PlaybackActivity extends AppCompatActivity {
     long current_delay = 500;
     long prev_time;
 
+    long start_time;
+    long end_time;
+
     FileInputStream fis;
-    XmlPullParserFactory factory;
-    
+
     GPXParser parser;
     Gpx gpx_parsed;
     ListIterator<TrackPoint> gpxTrackPointsIterator;
     List<TrackPoint> gpxTrackPoints;
+    TrackPoint prevGpxPoint;
 
     MapView map = null;
     IMapController mapController;
@@ -71,11 +73,14 @@ public class PlaybackActivity extends AppCompatActivity {
     String filename;
 
     Boolean play;
+    Boolean isVideoPlaying;
+    Boolean isPauseForScroll;
 
 
-    Button play_button,pause_button;
+    Button play_button,stop_button;
     VideoView mVideoView;
-    TextView filenameTextView;
+    SeekBar mSeekBar;
+    private Handler mHandler = new Handler();
 
 
     @Override
@@ -109,14 +114,16 @@ public class PlaybackActivity extends AppCompatActivity {
 
 
         // Buttons and video view
-        pause_button = (Button) findViewById(R.id.pause_button);
-        play_button = (Button) findViewById(R.id.play_button);
-        mVideoView = (VideoView) findViewById(R.id.videoView);
-        filenameTextView = (TextView) findViewById(R.id.textView);
+        stop_button = findViewById(R.id.stop_button);
+        play_button = findViewById(R.id.play_button);
+        mVideoView = findViewById(R.id.videoView);
+        mSeekBar = findViewById(R.id.seekView);
+        mSeekBar.getProgressDrawable().setColorFilter(getColor(R.color.black_overlay), PorterDuff.Mode.SRC_ATOP);
+
 
 
         //Configuring map display
-        map = (MapView) findViewById(R.id.map);
+        map = findViewById(R.id.map);
         map.setTileSource(TileSourceFactory.MAPNIK);
 
         mapController = map.getController();
@@ -129,36 +136,95 @@ public class PlaybackActivity extends AppCompatActivity {
         mVideoView.setVideoURI(uri);
         mVideoView.requestFocus();
 
-        //Setting filename into textview
-        filenameTextView.setText(filename);
+
+        mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean fromUser) {
+                if (fromUser){
+                    set_gpx_track(); //Setting map position
+                    if (isVideoPlaying){
+                        start_playback();
+                    }
+                    else{
+                        // Set position in image
+                        mVideoView.seekTo(progressToTimer(mSeekBar.getProgress(),mVideoView.getDuration()));
+                    }
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                // If video was playing , then it was paused for moving the seekbar
+                // After scrolling in this case video should continue playing
+                isPauseForScroll = isVideoPlaying;
+                pause_playback();
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                set_gpx_track();
+                mVideoView.seekTo(progressToTimer(mSeekBar.getProgress(),mVideoView.getDuration()));
+                if(isPauseForScroll){
+                    start_playback();
+                }
+            }
+        });
 
 
         play_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                set_gpx_track();
                 start_playback();
             }
         });
 
 
-        pause_button.setOnClickListener(new View.OnClickListener() {
+        stop_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                stop_gps_playback();
-                //Video may be longer than gpx file
-                stop_video_playback();
+                pause_playback();
             }
         });
 
         mVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
-                stop_video_playback();
+                stop_playback();
             }
         });
 
-        start_playback();
+        play = false;
+        if (open_gpx_read()) {
+            draw_track();
+            set_gpx_track();
+            start_playback();
+        }
     }
+
+
+    private void startProgressBar() {
+        mHandler.postDelayed(updateTimeTask, 100);
+    }
+
+    private void stopProgressBar(){
+        mHandler.removeCallbacks(updateTimeTask);
+    }
+
+    private Runnable updateTimeTask = new Runnable() {
+        @Override
+        public void run() {
+            long totalDuration = mVideoView.getDuration();
+            long currentDuration = mVideoView.getCurrentPosition();
+
+            // update progress bar
+            int progress = (getProgressPercentage(currentDuration,
+                    totalDuration));
+            mSeekBar.setProgress(progress);
+            mHandler.postDelayed(this, 100);
+        }
+    };
+
 
     @Override
     protected void onPause(){
@@ -187,7 +253,7 @@ public class PlaybackActivity extends AppCompatActivity {
             return false;
         }
 
-        
+
         // We support playback of first segment of first track only
         if (gpx_parsed!=null){
             List<Track> tracks = gpx_parsed.getTracks();
@@ -197,91 +263,165 @@ public class PlaybackActivity extends AppCompatActivity {
                 if (trackSegments.size() > 0) {
                     gpxTrackPoints = trackSegments.get(0).getTrackPoints();
                     gpxTrackPointsIterator = gpxTrackPoints.listIterator();
+                    start_time = gpxTrackPoints.get(0).getTime().getMillis();
+                    end_time = gpxTrackPoints.get(gpxTrackPoints.size()-1).getTime().getMillis();
                     return true;
                 }
             }
         }
-        
+
         display_error_and_quit(INVALID_GPX_FILE);
         return false;
     }
 
 
+
     //Update map with current co-ordinates
     private void update_map(){
-        GeoPoint nextGeoPoint = get_next_location();
-        if (nextGeoPoint==null){
+        GeoPoint currentGeoPoint = getGeoPoint(prevGpxPoint);
+        if (currentGeoPoint==null){
                 stop_gps_playback();
                 return;
         }
-        mapController.setCenter(nextGeoPoint);
+        mapController.setCenter(currentGeoPoint);
 
         if (prev_marker!=null){
             map.getOverlays().remove(prev_marker);
         }
         Marker marker = new Marker(map);
-        marker.setPosition(nextGeoPoint);
+        marker.setPosition(currentGeoPoint);
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(marker);
         marker.setIcon(PlaybackActivity.this.getResources().getDrawable(R.drawable.center));
         prev_marker = marker;
         map.invalidate();
+        get_next_location();
+    }
+
+
+    private GeoPoint getGeoPoint(TrackPoint point){
+        if (point==null) return null;
+
+        Double Latitude =  point.getLatitude();
+        Double Longitude = point.getLongitude();
+        return new GeoPoint(Latitude,Longitude);
     }
 
 
     // Function to begin playing of video and gps data
     private void start_playback(){
-
-           if(!mVideoView.isPlaying() && gpx_parsed==null){
-
-               if(open_gpx_read()){
-                   play = true;
-
-                   draw_track();
-                   start_video_playback();
-                   //Update to initial position
-                   update_map();
-                   update_map();
-
-                   final Handler handler = new Handler();
-                   handler.postDelayed(new Runnable() {
-                       @Override
-                       public void run() {
-                           if(play){
-                               update_map();
-                               handler.postDelayed(this,current_delay);
-                           }
-                           else{
-                               handler.removeCallbacks(this);
-                           }
-                       }
-                   }, current_delay);
-               }
+           if(!mVideoView.isPlaying() && !play){
+               start_video_playback();
+               start_gps_playback();
+               play_button.setVisibility(View.INVISIBLE);
+               stop_button.setVisibility(View.VISIBLE);
            }
-           else{
-                 Toast.makeText(getApplicationContext(),"Playback already started",Toast.LENGTH_SHORT).show();
-           }
+    }
+
+
+    private void stop_playback(){
+        stop_gps_playback();
+        //Video may be longer than gpx file
+        stop_video_playback();
+        set_gpx_track();
+        stop_button.setVisibility(View.INVISIBLE);
+        play_button.setVisibility(View.VISIBLE);
+    }
+
+
+    private void pause_playback(){
+        stop_gps_playback();
+        pause_video_playback();
+        stop_button.setVisibility(View.INVISIBLE);
+        play_button.setVisibility(View.VISIBLE);
+    }
+
+
+
+    private void set_gpx_track() {
+        // Set start point based on current time estimated from seek bar
+
+        int current_duration = progressToTimer(mSeekBar.getProgress(), mVideoView.getDuration());
+        long current_time = start_time + (long) current_duration;
+
+        for(int i =0 ; i<gpxTrackPoints.size(); ++i){
+            long diff = gpxTrackPoints.get(i).getTime().getMillis() - current_time;
+            if (diff >= 0){
+                // Start from Beginning
+                if (diff==0 && i==0){
+                    gpxTrackPointsIterator = gpxTrackPoints.listIterator(0);
+                    prevGpxPoint = gpxTrackPointsIterator.next();
+                    prev_time = prevGpxPoint.getTime().getMillis();
+                    update_map();
+                    return;
+                }
+
+                // Start from between
+                prevGpxPoint = gpxTrackPoints.get(i-1);
+                gpxTrackPointsIterator = gpxTrackPoints.listIterator(i);
+                update_map();
+                // Overwrite current delay with remaining time
+                current_delay = diff;
+                return;
+            }
+        }
+
+        // Video extends after last recorded point
+        prevGpxPoint = gpxTrackPoints.get(gpxTrackPoints.size()-1);
+        gpxTrackPointsIterator = gpxTrackPoints.listIterator(gpxTrackPoints.size());
+        update_map();
+    }
+
+
+    private void start_gps_playback(){
+        play = true;
+        final Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if(play){
+                    update_map();
+                    handler.postDelayed(this,current_delay);
+                }
+                else{
+                    handler.removeCallbacks(this);
+                }
+            }
+        }, current_delay);
     }
 
 
     private void stop_gps_playback(){
         play = false;
-        gpx_parsed = null;
-        factory = null;
     }
 
 
     private void start_video_playback(){
         //Start video playing
-        mVideoView.seekTo(0);
+        mVideoView.seekTo(progressToTimer(mSeekBar.getProgress(),mVideoView.getDuration()));
         mVideoView.start();
+        startProgressBar();
+        isVideoPlaying = true;
     }
 
 
     private void stop_video_playback(){
-        if (mVideoView.isPlaying()){
+        if (mVideoView.isPlaying()) {
             mVideoView.pause();
         }
+        mSeekBar.setProgress(0);
+        stopProgressBar();
+        mVideoView.seekTo(0);
+        isVideoPlaying = false;
+    }
+
+
+    private void pause_video_playback(){
+        if (mVideoView.isPlaying()) {
+            mVideoView.pause();
+        }
+        stopProgressBar();
+        isVideoPlaying = false;
     }
 
 
@@ -289,7 +429,6 @@ public class PlaybackActivity extends AppCompatActivity {
     private void draw_track(){
 
         Polyline line = new Polyline(map);
-        line.setWidth(20f);
         List<GeoPoint> pts = new ArrayList<>();
 
         for (int i =0; i< gpxTrackPoints.size(); ++i){
@@ -304,30 +443,26 @@ public class PlaybackActivity extends AppCompatActivity {
 
 
 
-    //Get next location from currently open gpx file
-    private GeoPoint get_next_location(){
+    //Get next location
+    private void get_next_location(){
 
-        TrackPoint current_track;
-        if (gpxTrackPointsIterator.hasNext())
-            current_track = gpxTrackPointsIterator.next();
+        if (gpxTrackPointsIterator.hasNext()) {
+            prevGpxPoint = gpxTrackPointsIterator.next();
+
+            //Updating time to wait before fetching next location from gpx file
+            long new_time = prevGpxPoint.getTime().getMillis();
+            Log.d("time",Long.toString(new_time));
+            Log.d("time",Long.toString(prev_time));
+            current_delay =  new_time - prev_time; //Time value
+            prev_time = new_time;
+            Log.d("time",Long.toString(current_delay));
+        }
         else
-            return null;
-
-
-        Double Latitude =  current_track.getLatitude();
-        Double Longitude = current_track.getLongitude();
-        GeoPoint nextGeoPoint = new GeoPoint(Latitude,Longitude);
-
-        //Updating time to wait before fetching next location from gpx file
-        long new_time = current_track.getTime().getMillis();
-        Log.d("time",Long.toString(new_time));
-        Log.d("time",Long.toString(prev_time));
-        current_delay =  new_time - prev_time; //Time value
-        prev_time = new_time;
-        Log.d("time",Long.toString(current_delay));
-
-        return nextGeoPoint;
+            prevGpxPoint = null;
     }
+
+
+
 
 
     // Display error with alert box and finish activity
@@ -363,6 +498,29 @@ public class PlaybackActivity extends AppCompatActivity {
 
         AlertDialog dialog = alertBuilder.create();
         dialog.show();
+    }
+
+
+
+
+
+    //Utitliies for convrting between progress bar and time elapsed in video
+
+    public int getProgressPercentage(long currentDuration, long totalDuration){
+        double percentage;
+        percentage = Math.ceil((((double)currentDuration)/totalDuration)*100);
+        return (int) percentage;
+    }
+
+    /**
+     * Function to change progress to timer
+     * @param progress -
+     * @param totalDuration
+     * returns current duration in milliseconds
+     * */
+    public int progressToTimer(int progress, int totalDuration) {
+        // return current duration in milliseconds
+        return  (int) ((((double)progress) / 100) * totalDuration);
     }
 
 }

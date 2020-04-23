@@ -29,13 +29,13 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.ViewHo
     // Provide a reference to the views for each data item
     // Complex data items may need more than one view per item, and
     // you provide access to all the views for a data item in a view holder
-    public static class ViewHolder extends RecyclerView.ViewHolder {
+    static class ViewHolder extends RecyclerView.ViewHolder {
         // each data item is just a string in this case
-        public View mView;
-        public final ImageView mImageView;
-        public final TextView mTextView;
+        View mView;
+        final ImageView mImageView;
+        final TextView mTextView;
 
-        public ViewHolder(View v) {
+        ViewHolder(View v) {
             super(v);
             mView = v;
             mImageView = v.findViewById(R.id.item_image);
