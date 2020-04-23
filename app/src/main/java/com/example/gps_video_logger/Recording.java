@@ -88,7 +88,7 @@ public class Recording extends AppCompatActivity{
     Button fileButton;
     Button aboutButton;
 
-    // Imageview doesn't display tick because of issue with resolution-- bitmap issue most rpob
+    // Imageview doesn't display tick because of issue with resolution-- bitmap issue most probably
     Button tickView;
     Button mProgressBar;
 
@@ -539,19 +539,16 @@ public class Recording extends AppCompatActivity{
     // Update the spinner based on gps fix
     private void setGPSFixSpinner(){
 
-        // Notifying users that fix is gone while recording???
-//        if (!isRecording) {
-            if (hasGPSFix) {
-                mProgressBar.clearAnimation();
-                mProgressBar.setVisibility(View.INVISIBLE);
-                tickView.setVisibility(View.VISIBLE);
-            } else {
-                mProgressBar.startAnimation(
-                        AnimationUtils.loadAnimation(this, R.anim.rotate) );
-                mProgressBar.setVisibility(View.VISIBLE);
-                tickView.setVisibility(View.INVISIBLE);
-            }
-//        }
+        if (hasGPSFix) {
+            mProgressBar.clearAnimation();
+            mProgressBar.setVisibility(View.INVISIBLE);
+            tickView.setVisibility(View.VISIBLE);
+        } else {
+            mProgressBar.startAnimation(
+                    AnimationUtils.loadAnimation(this, R.anim.rotate) );
+            mProgressBar.setVisibility(View.VISIBLE);
+            tickView.setVisibility(View.INVISIBLE);
+        }
     }
 
     private void setGPSFix(boolean state){
@@ -731,7 +728,7 @@ public class Recording extends AppCompatActivity{
 
         try {
             serializer.setOutput(fos, "UTF-8");
-            serializer.startDocument(null, Boolean.valueOf(true));
+            serializer.startDocument(null, Boolean.TRUE);
 
             serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
 

@@ -64,6 +64,7 @@ public class FilePicker extends AppCompatActivity {
     };
 
 
+    // Prompt for confirmation of deletion using alert dialog
     private void confirm_deletion(final int position){
 
         // Setting Dialog Title
@@ -116,6 +117,7 @@ public class FilePicker extends AppCompatActivity {
     }
 
 
+    // Return names of video files in the directory
     private ArrayList<String> FetchFileList() {
 
         ArrayList<String> filenames = new ArrayList<String>();
