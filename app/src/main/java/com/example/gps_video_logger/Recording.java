@@ -77,6 +77,7 @@ public class Recording extends AppCompatActivity{
     private LocationManager mlocManager = null;
     private boolean isGPSLocationUpdatesActive = false;
     private long mLastLocationMillis;
+    private long currentRecordingStartTime;
     private boolean hasGPSFix = false;
     Location mLastLocation = null;
 
@@ -84,6 +85,7 @@ public class Recording extends AppCompatActivity{
     Button recordButton;
     boolean isRecording = false;
     boolean forceRec = false;
+    boolean gotFirstFix = true;
 
     Button fileButton;
     Button aboutButton;
@@ -221,6 +223,7 @@ public class Recording extends AppCompatActivity{
                 else{
 
                     if (hasGPSFix) {
+                        gotFirstFix = true;
                         prepare_and_start_rec();
                     }
                     else{
@@ -239,6 +242,7 @@ public class Recording extends AppCompatActivity{
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
                                 forceRec = true;
+                                gotFirstFix = false;
                                 prepare_and_start_rec();
                             }
                         });
@@ -313,6 +317,7 @@ public class Recording extends AppCompatActivity{
         // Initialize video camera
         if (prepareVideoRecorder()) {
 
+            currentRecordingStartTime = System.currentTimeMillis();
             // Camera is available and unlocked, MediaRecorder is prepared,
             // now you can start recording
             mediaRecorder.start();
@@ -367,7 +372,14 @@ public class Recording extends AppCompatActivity{
             mLastLocationMillis = SystemClock.elapsedRealtime();
             Log.d("GPS","Loc changed");
             if (isRecording && (hasGPSFix || forceRec)){
-                update_location_gpx(location);
+                if (!gotFirstFix){
+                    // When the recording was forced by user, the first location after fix is obtained is
+                    // saved as location at start time also.
+                    // This ensures gpx and video file are in sync
+                    update_location_gpx(location, currentRecordingStartTime);
+                    gotFirstFix = true;
+                }
+                update_location_gpx(location, System.currentTimeMillis());
             }
         }
 
@@ -751,7 +763,7 @@ public class Recording extends AppCompatActivity{
 
 
     // Update provided location data into gpx file
-    private void update_location_gpx(Location location){
+    private void update_location_gpx(Location location, long time_in_ms){
         try {
             serializer.startTag(null, "trkpt");
             serializer.attribute(null,"lat", Double.toString(location.getLatitude()));
@@ -762,7 +774,7 @@ public class Recording extends AppCompatActivity{
             serializer.endTag(null,"ele");
             serializer.startTag(null,"time");
 
-            String time = sdf.format(System.currentTimeMillis());
+            String time = sdf.format(time_in_ms);
 
             serializer.text(time);
             serializer.endTag(null,"time");
