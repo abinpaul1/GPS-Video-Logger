@@ -1,5 +1,5 @@
 # GPS-Video-Logger<br>
-[![Releases](http://img.shields.io/github/release/abinpaul1/GPS-Video-Logger.svg?label=%20release%20&color=green)](https://github.com/abinpaul1/GPS-Video-Logger/releases) [![GitHub license](https://img.shields.io/badge/license-GPL_3-blue.svg?label=%20license%20)](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/LICENSE)<br>
+[![Releases](http://img.shields.io/github/release/abinpaul1/GPS-Video-Logger.svg?label=%20release%20&color=green)](https://github.com/abinpaul1/GPS-Video-Logger/releases) [![GitHub license](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/LICENSE)<br>
 Record and playback video and live location data simultaneously.
 
 <img src = "Screenshots/Launch.png" width ="200" /> <img src = "Screenshots/Camera.png" width ="200" /> <img src = "Screenshots/Journeys.png" width ="200" /> <img src = "Screenshots/Playback.png" width ="200" />
