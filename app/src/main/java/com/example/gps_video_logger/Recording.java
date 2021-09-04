@@ -483,6 +483,7 @@ public class Recording extends AppCompatActivity{
 
         //Finding back-camera id
         cameraId = getBackCameraID();
+        Log.d("Camera","Initialized");
 
     }
 

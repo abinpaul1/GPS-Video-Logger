@@ -1,6 +1,7 @@
 package com.example.gps_video_logger;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -409,7 +410,7 @@ public class PlaybackActivity extends AppCompatActivity {
         marker.setPosition(currentGeoPoint);
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(marker);
-        marker.setIcon(PlaybackActivity.this.getResources().getDrawable(R.drawable.center));
+        marker.setDefaultIcon();
         prev_marker = marker;
         map.invalidate();
         get_next_location();
