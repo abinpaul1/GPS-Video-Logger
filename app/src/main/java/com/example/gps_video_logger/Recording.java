@@ -1,6 +1,7 @@
 package com.example.gps_video_logger;
 
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
@@ -14,6 +15,7 @@ import java.util.Date;
 import java.util.TimeZone;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -38,50 +40,69 @@ import android.view.Surface;
 import android.view.View;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
 import org.xmlpull.v1.XmlSerializer;
 
 public class Recording extends AppCompatActivity{
+    // Mode configuration settings
+    //Common
+    private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
+    private long LOCATION_INTERVAL = 1000; // How frequently should location be stored with respect to final video
+
+    //Video Mode
+    private int VIDEO_FPS = 25;
+    private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
+
+    //Timelapse values - Populated based on Camcorder advertised hardware capabilites
+    private long TIME_LAPSE_FPS;
+    private int PLAYBACK_FRAME_RATE; // Number of FPS when video is played
+    private int TIME_LAPSE_QUALITY = CamcorderProfile.QUALITY_TIME_LAPSE_480P;
+
+
+
+    private static final int VIDEO_MODE = 1;
+    private static final int TIMELAPSE_MODE = 2;
+    long FREQUENCY = 1000; // frequency at which location is queried
+    int mode;
+
+
 
 
     //Msg codes;
     private static final int INSTRUCTIONS = 1;
     private static final int FIX_PENDING = 2;
     private static final int FIX_INFO = 3;
-
-
-    //Constants
-    private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
-    private int VIDEO_FORMAT = MediaRecorder.OutputFormat.MPEG_4;
-
-    private static final long DRIVE_FREQUENCY = 1000;
-    private static final long WALK_FREQUENCY = 4000;
-    private static final int DRIVE = 1;
-    private static final int WALK = 2;
-    long FREQUENCY; //milli sec
-    int mode;
+    private static final int EXPERIMENTAL_TIME_LAPSE_MODE = 4;
 
     private String filename;
 
+    // Camera parameter
     Camera mCamera;
     int cameraId;
     CameraPreview mPreview;
+
+    //  Mediarecorder
     MediaRecorder mediaRecorder;
 
+    // Files
     FileOutputStream fos;
     XmlSerializer serializer;
     SimpleDateFormat sdf;
 
+
+    // Location parameters
     private LocationManager mlocManager = null;
     private boolean isGPSLocationUpdatesActive = false;
     private long mLastLocationMillis;
     private long currentRecordingStartTime;
+    private long prevLocSavedTime = -1; // the time corresponding to previously saved location in gpx file
     private boolean hasGPSFix = false;
     Location mLastLocation = null;
 
-
+    // Record parameters
     Button recordButton;
     boolean isRecording = false;
     boolean forceRec = false;
@@ -95,6 +116,12 @@ public class Recording extends AppCompatActivity{
     Button mProgressBar;
 
     Button modeButton;
+
+    // Mode Settings Details
+    TextView mode_text;
+    TextView fps_text;
+    TextView loc_interval_text;
+    TextView quality_text;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -137,12 +164,19 @@ public class Recording extends AppCompatActivity{
 
         modeButton = findViewById(R.id.mode_button);
         modeButton.setOnClickListener(modeChangeListener);
-        set_mode(DRIVE);
 
+        // For details on top right corner
+        mode_text = findViewById(R.id.modeText);
+        fps_text = findViewById(R.id.framesText);
+        quality_text = findViewById(R.id.qualityText);
+        loc_interval_text = findViewById(R.id.freqText);
+
+        set_mode(VIDEO_MODE);
 
         initialize_app_folder();
         initialize_camera();
         initialize_location();
+
     }
 
     @Override
@@ -170,7 +204,7 @@ public class Recording extends AppCompatActivity{
         mCamera = getCameraInstance();
 
         //Setting orientation of camera
-        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        int result = getCameraDisplayOrientation(this, cameraId);
         mCamera.setDisplayOrientation(result);
 
 
@@ -188,10 +222,10 @@ public class Recording extends AppCompatActivity{
 
     //Detecting and adjusting preview camera based on orientation
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
-        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        int result = getCameraDisplayOrientation(this, cameraId);
 
         Log.d("Cam",Integer.toString(result));
         mCamera.setDisplayOrientation(result);
@@ -207,11 +241,13 @@ public class Recording extends AppCompatActivity{
 
     // OnClick listeners
 
-    private View.OnClickListener recordButtonOnClickListener = new View.OnClickListener() {
+    private final View.OnClickListener recordButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
             if (isRecording) {
+                recordButton.setEnabled(false);
                 stop_rec_and_release();
+                recordButton.setEnabled(true);
             } else {
                 //Check if location is enabled
                 if(!isLocationEnabled()){
@@ -263,7 +299,7 @@ public class Recording extends AppCompatActivity{
         }
     };
 
-    private View.OnClickListener fileButtonOnClickListener = new View.OnClickListener() {
+    private final View.OnClickListener fileButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             if (isRecording){
@@ -276,7 +312,7 @@ public class Recording extends AppCompatActivity{
         }
     };
 
-    private View.OnClickListener aboutButtonOnClickListener = new View.OnClickListener() {
+    private final View.OnClickListener aboutButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             // Display alert showing usage specifications
@@ -287,7 +323,7 @@ public class Recording extends AppCompatActivity{
     };
 
 
-    private View.OnClickListener GpsFixListener = new View.OnClickListener() {
+    private final View.OnClickListener GpsFixListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             display_alert(FIX_INFO);
@@ -295,15 +331,18 @@ public class Recording extends AppCompatActivity{
     };
 
 
-    private View.OnClickListener modeChangeListener = new View.OnClickListener() {
+    private final View.OnClickListener modeChangeListener = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-            Log.d("Mode","Change requested"+Integer.toString(mode));
+            Log.d("Mode","Change requested"+ mode);
             if (!isRecording){
-                if (mode == DRIVE)
-                    set_mode(WALK);
-                else if (mode == WALK)
-                    set_mode(DRIVE);
+                if (mode == VIDEO_MODE){
+                    display_alert(EXPERIMENTAL_TIME_LAPSE_MODE);
+                    set_mode(TIMELAPSE_MODE);
+                }
+                else if (mode == TIMELAPSE_MODE){
+                    set_mode(VIDEO_MODE);
+                }
             }
         }
     };
@@ -347,12 +386,19 @@ public class Recording extends AppCompatActivity{
 
         // stop recording and release camera
         mediaRecorder.stop();  // stop the recording
+        Log.d("Rec","Mediarecorder stopped");
+
 
         //Close GPX File
         finish_gpx_file();
+        Log.d("Rec","File Closed");
+
 
         releaseMediaRecorder(); // release the MediaRecorder object
+        Log.d("Rec","MediaRecorder released");
+
         mCamera.lock();         // take camera access back from MediaRecorder
+        Log.d("Rec","Take camera access back from MediaRecorder");
 
         // Inform the user that recording has stopped
         recordButton.setBackgroundResource(R.drawable.rec);
@@ -364,7 +410,7 @@ public class Recording extends AppCompatActivity{
 
     // Location listener
     //    https://stackoverflow.com/questions/2021176/how-can-i-check-the-current-status-of-the-gps-receiver
-    private LocationListener mlocListener = new LocationListener() {
+    private final LocationListener mlocListener = new LocationListener() {
         @Override
         public void onLocationChanged(Location location) {
             if (location == null) return;
@@ -402,7 +448,8 @@ public class Recording extends AppCompatActivity{
 
     // GpsStatus Listener
     //    https://stackoverflow.com/questions/2021176/how-can-i-check-the-current-status-of-the-gps-receiver
-    private GpsStatus.Listener mGpsStatusListener = new GpsStatus.Listener() {
+    private final GpsStatus.Listener mGpsStatusListener = new GpsStatus.Listener() {
+        @SuppressLint("MissingPermission")
         @Override
         public void onGpsStatusChanged(int event) {
             switch (event) {
@@ -439,26 +486,62 @@ public class Recording extends AppCompatActivity{
             }
         }
     };
+    
+    
+//    // Updates displayed values to values currently set
+//    private void update_UI(){
+//        mode_text.setText("Video Mode");
+//        fps_text.setText(Integer.toString(VIDEO_FPS));
+//        quality_text.setText(Integer.toString(VIDEO_QUALITY));
+//        loc_interval_text.setText(Long.toString(LOCATION_INTERVAL));
+//    }
+
+
+    // Utilty function that normalizes time based on mode (video/time lapse)
+    private long normalize_time_based_on_mode(long current_time){
+        if (mode==TIMELAPSE_MODE){
+            // Note : The time we store in GPX file is with respect to the final video
+            // So in the case of a timelapse video at 2 FPS and PLAYBACK_FRAME_RATE = 16, 8 seconds of travel time would
+            // be 1 second in final video. So we normalize the actual time to accomodate this
+            return (currentRecordingStartTime + (current_time-currentRecordingStartTime)/(PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS));
+        }
+
+        // For VIDEO_MODE return time as is
+        return current_time;
+    }
 
 
 
-
-    // Set mode :- Drive or walk mode
+    // Set mode :- VIDEO_MODE or TIMELAPSE_MODE mode
     private void set_mode(int new_mode){
         switch (new_mode){
-            case DRIVE:
-                FREQUENCY = DRIVE_FREQUENCY;
-                modeButton.setBackgroundResource(R.drawable.drive);
-                mode = DRIVE;
+            case VIDEO_MODE:
+                modeButton.setBackgroundResource(R.drawable.video_mode);
+                mode = VIDEO_MODE;
                 updateLocationFreq(FREQUENCY);
-                Log.d("Mode","Drive");
+                Log.d("Mode","VIDEO_MODE");
                 break;
-            case WALK:
-                FREQUENCY = WALK_FREQUENCY;
-                modeButton.setBackgroundResource(R.drawable.walk);
-                mode = WALK;
+            case TIMELAPSE_MODE:
+                // If 2 FPS at 16 PLAYBACK_FRAME_RATE, 8 seconds of travel correspond to 1 second of footage
+                // If LOCATION_INTERVAL is 2, that means we need location at 2 second intervals in
+                // final footage which would translate to getting 1 location point in 16 seconds when the
+                // actual recording is happening
+
+                // These values depend on camcorder profile
+                CamcorderProfile profile;
+                if(CamcorderProfile.hasProfile(TIME_LAPSE_QUALITY)){
+                    //Checking if the profile is available
+                    profile =  CamcorderProfile.get(TIME_LAPSE_QUALITY);
+                }
+                else{
+                    profile = CamcorderProfile.get(CamcorderProfile.QUALITY_TIME_LAPSE_LOW);
+                }
+                TIME_LAPSE_FPS = (long)(profile.videoFrameRate/6.0);
+                PLAYBACK_FRAME_RATE = profile.videoFrameRate;
+                modeButton.setBackgroundResource(R.drawable.timelapse_mode);
+                mode = TIMELAPSE_MODE;
                 updateLocationFreq(FREQUENCY);
-                Log.d("Mode","Walk");
+                Log.d("Mode","TIMELAPSE_MODE");
                 break;
         }
     }
@@ -473,7 +556,7 @@ public class Recording extends AppCompatActivity{
         mCamera = getCameraInstance();
 
         //Setting orientation of camera
-        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        int result = getCameraDisplayOrientation(this, cameraId);
         mCamera.setDisplayOrientation(result);
 
         // Create our Preview view and set it as the content of our activity.
@@ -583,7 +666,7 @@ public class Recording extends AppCompatActivity{
         mCamera = getCameraInstance();
 
         //Getting and setting orientation
-        int result = getCameraDisplayOrientation(this, cameraId, mCamera);
+        int result = getCameraDisplayOrientation(this, cameraId);
 
         Log.d("Cam",Integer.toString(result));
         mCamera.setDisplayOrientation(result);
@@ -595,21 +678,48 @@ public class Recording extends AppCompatActivity{
         mediaRecorder.setCamera(mCamera);
         mediaRecorder.setOrientationHint(result);
 
-        // Step 2: Set sources
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
-        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+        // Step 2: Set sources and camcoder profile based on mode
 
-        // Step 3: Set a CamcorderProfile
-        CamcorderProfile profile;
-        if(CamcorderProfile.hasProfile(VIDEO_QUALITY)){
-            //Checking if the profile is available
-            profile =  CamcorderProfile.get(VIDEO_QUALITY);
+        if(mode == VIDEO_MODE){
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+            mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+            CamcorderProfile profile;
+            if(CamcorderProfile.hasProfile(VIDEO_QUALITY)){
+                //Checking if the profile is available
+                profile =  CamcorderProfile.get(VIDEO_QUALITY);
+            }
+            else{
+                profile = CamcorderProfile.get(CamcorderProfile.QUALITY_LOW);
+            }
+
+            profile.fileFormat = VIDEO_FORMAT;
+            mediaRecorder.setProfile(profile);
         }
-        else{
-            profile = CamcorderProfile.get(CamcorderProfile.QUALITY_LOW);
+
+
+        if (mode==TIMELAPSE_MODE){
+            mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+
+            CamcorderProfile profile;
+            if(CamcorderProfile.hasProfile(TIME_LAPSE_QUALITY)){
+                //Checking if the profile is available
+                profile =  CamcorderProfile.get(TIME_LAPSE_QUALITY);
+            }
+            else{
+                profile = CamcorderProfile.get(CamcorderProfile.QUALITY_TIME_LAPSE_LOW);
+            }
+            profile.fileFormat = VIDEO_FORMAT;
+            mediaRecorder.setProfile(profile);
+
+            Log.d("Timelapse", Integer.toString(profile.videoBitRate));
+            Log.d("Timelapse", Integer.toString(profile.videoFrameRate));
+
+            // Todo : Let the user fully customize capture rate, playback rate
+
+            mediaRecorder.setCaptureRate(profile.videoFrameRate/6.0f);
+            mediaRecorder.setVideoFrameRate(profile.videoFrameRate);
+            mediaRecorder.setVideoEncodingBitRate(profile.videoBitRate);
         }
-        profile.fileFormat = VIDEO_FORMAT;
-        mediaRecorder.setProfile(profile);
 
 
         // Step 4: Set output file
@@ -660,6 +770,7 @@ public class Recording extends AppCompatActivity{
         Camera c = null;
         try {
             c = Camera.open(); // attempt to get a Camera instance
+            c.getParameters().setRecordingHint(true);
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
@@ -695,7 +806,7 @@ public class Recording extends AppCompatActivity{
     // Utitliy function to get camera orientation based on device orientation
     // https://developer.android.com/reference/android/hardware/Camera#setDisplayOrientation
     public static int getCameraDisplayOrientation(Activity activity,
-                                                   int cameraId, android.hardware.Camera camera) {
+                                                   int cameraId) {
         android.hardware.Camera.CameraInfo info =
                 new android.hardware.Camera.CameraInfo();
         android.hardware.Camera.getCameraInfo(cameraId, info);
@@ -765,6 +876,21 @@ public class Recording extends AppCompatActivity{
 
     // Update provided location data into gpx file
     private void update_location_gpx(Location location, long time_in_ms){
+
+        // Location need only be saved less frequently in time lapse mode
+        // Ideally we should save only points for every one sec in final video
+        // (PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS) seconds in realtime would be one second in final video
+
+        long normalized_time = normalize_time_based_on_mode(time_in_ms);
+
+        if (mode == TIMELAPSE_MODE){
+            long preferred_time_gap = (PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS)*500; // Convert to Millisec
+            // Time is compared in realtime
+            if ( (time_in_ms- prevLocSavedTime) < preferred_time_gap ){
+                return;
+            }
+        }
+
         try {
             serializer.startTag(null, "trkpt");
             serializer.attribute(null,"lat", Double.toString(location.getLatitude()));
@@ -775,12 +901,16 @@ public class Recording extends AppCompatActivity{
             serializer.endTag(null,"ele");
             serializer.startTag(null,"time");
 
-            String time = sdf.format(time_in_ms);
+            String time = sdf.format(normalized_time); // For video mode it would same
 
             serializer.text(time);
             serializer.endTag(null,"time");
 
             serializer.endTag(null, "trkpt");
+
+            // Update prev saved time. Real time is stored here for future comparison
+            prevLocSavedTime = time_in_ms;
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -822,7 +952,7 @@ public class Recording extends AppCompatActivity{
                         "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
                         "Swipe to delete video file" + "\n" +
                         "Long press to rename videos" + "\n" +
-                        "Drive mode records location every second whereas walk mode records every 4 seconds";
+                        "Video Mode and Time Lapse Mode available";
                 break;
             case FIX_PENDING:
                 msg = "Please wait for the GPS to get a fix on your location." + "\n" +
@@ -832,6 +962,12 @@ public class Recording extends AppCompatActivity{
                 msg = "GPS Fix Status" +"\n" +
                         "A GPS Fix means your device is in view of enough satellites to get a proper lock on your position" + "\n" +
                         "Even while recording, locations are saved only when a fix is present";
+                break;
+            case EXPERIMENTAL_TIME_LAPSE_MODE:
+                msg = "Time Lapse Mode - Experimental" + "\n" +
+                        "Time lapse recording and playback is heavily dependant on hardware capabiltiy" + "\n"+
+                        "Accuracy can not be guaranteed in final output";
+                break;
         }
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
