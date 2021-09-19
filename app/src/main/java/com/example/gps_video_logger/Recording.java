@@ -21,6 +21,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.hardware.Camera;
@@ -36,8 +37,10 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Xml;
+import android.view.Display;
 import android.view.Surface;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.TextView;
@@ -81,8 +84,9 @@ public class Recording extends AppCompatActivity{
 
     // Camera parameter
     Camera mCamera;
-    int cameraId;
+    int currentCameraId;
     CameraPreview mPreview;
+    int currentCameraOrientationResult;
 
     //  Mediarecorder
     MediaRecorder mediaRecorder;
@@ -104,6 +108,8 @@ public class Recording extends AppCompatActivity{
 
     // Record parameters
     Button recordButton;
+    Button toggleFlashButton;
+    Button switchCameraButton;
     boolean isRecording = false;
     boolean forceRec = false;
     boolean gotFirstFix = true;
@@ -143,6 +149,8 @@ public class Recording extends AppCompatActivity{
 
         //Initializing buttons and listeners
         recordButton = (Button) findViewById(R.id.record_button);
+        switchCameraButton = (Button) findViewById(R.id.switch_cam_button);
+        toggleFlashButton = (Button) findViewById(R.id.flash_button);
         fileButton = (Button) findViewById(R.id.files_button);
         aboutButton = (Button) findViewById(R.id.about_button);
 
@@ -152,6 +160,9 @@ public class Recording extends AppCompatActivity{
 
         //Toggling record button to start and stop recording
         recordButton.setOnClickListener(recordButtonOnClickListener);
+
+        switchCameraButton.setOnClickListener(switchCameraListener);
+        toggleFlashButton.setOnClickListener(toggleFlashlightListener);
 
         // Launch Filepicker activity on clicking
         fileButton.setOnClickListener(fileButtonOnClickListener);
@@ -174,7 +185,9 @@ public class Recording extends AppCompatActivity{
         set_mode(VIDEO_MODE);
 
         initialize_app_folder();
-        initialize_camera();
+        // Default camera is set as back camera
+        currentCameraId = getBackCameraID();
+        initialize_camera(currentCameraId);
         initialize_location();
 
     }
@@ -187,6 +200,8 @@ public class Recording extends AppCompatActivity{
         stopPreview();
         recordButton.setBackgroundResource(R.drawable.rec);
         isRecording = false;
+        // Unlock screen rotate
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
     }
 
 
@@ -200,18 +215,8 @@ public class Recording extends AppCompatActivity{
     protected void onResume() {
         super.onResume();
         //Restart location updates
-        // Create an instance of Camera
-        mCamera = getCameraInstance();
-
-        //Setting orientation of camera
-        int result = getCameraDisplayOrientation(this, cameraId);
-        mCamera.setDisplayOrientation(result);
-
-
-        ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
-        // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(this, mCamera);
-        preview.addView(mPreview);
+        // Reinitialize Camera
+        initialize_camera(currentCameraId);
     }
 
     @Override
@@ -225,10 +230,10 @@ public class Recording extends AppCompatActivity{
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
-        int result = getCameraDisplayOrientation(this, cameraId);
+        currentCameraOrientationResult = getCameraDisplayOrientation(this, currentCameraId);
 
-        Log.d("Cam",Integer.toString(result));
-        mCamera.setDisplayOrientation(result);
+        Log.d("Cam",Integer.toString(currentCameraOrientationResult));
+        mCamera.setDisplayOrientation(currentCameraOrientationResult);
     }
 
 
@@ -347,6 +352,69 @@ public class Recording extends AppCompatActivity{
         }
     };
 
+    private final View.OnClickListener toggleFlashlightListener = new View.OnClickListener(){
+        @Override
+        public void onClick(View view) {
+            // Dont do anything if front camera
+            // For front camera, getParamaters returns null
+            Camera.CameraInfo info = new Camera.CameraInfo();
+            Camera.getCameraInfo(currentCameraId, info);
+            if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT){
+                return;
+            }
+
+            // Dont do anything if flashlight feature is absent
+            if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)){
+                return;
+            }
+
+            Camera.Parameters params = mCamera.getParameters();
+
+            // Toggling
+            if (params.getFlashMode().equals(Camera.Parameters.FLASH_MODE_TORCH)){
+                params.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+            }
+            else{
+                params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+            }
+
+            mCamera.setParameters(params);
+            mCamera.startPreview();
+        }
+    };
+
+    private final View.OnClickListener switchCameraListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (isRecording){
+                Toast.makeText(getApplicationContext(), "Recording in Progress", Toast.LENGTH_SHORT);
+                return;
+            }
+
+
+            if (mCamera != null) {
+                ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
+                preview.removeView(mPreview);
+                mPreview = null;
+
+                mCamera.stopPreview();
+                //NB: if you don't release the current camera before switching, you app will crash
+                mCamera.release();
+
+                //swap the id of the camera to be used
+                if(currentCameraId == Camera.CameraInfo.CAMERA_FACING_BACK){
+                    currentCameraId = getFrontCameraID();
+                }
+                else {
+                    currentCameraId = getBackCameraID();
+                }
+
+
+                // Reinitialize with changed cameraId
+                initialize_camera(currentCameraId);
+            }
+        }
+    };
 
     //Recording start and stop functions
     private void prepare_and_start_rec(){
@@ -355,6 +423,9 @@ public class Recording extends AppCompatActivity{
 
         // Initialize video camera
         if (prepareVideoRecorder()) {
+
+            // Lock screen orientation
+            lockOrientation(this);
 
             currentRecordingStartTime = System.currentTimeMillis();
             // Camera is available and unlocked, MediaRecorder is prepared,
@@ -399,6 +470,9 @@ public class Recording extends AppCompatActivity{
 
         mCamera.lock();         // take camera access back from MediaRecorder
         Log.d("Rec","Take camera access back from MediaRecorder");
+
+        // Unlock screen rotation
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
 
         // Inform the user that recording has stopped
         recordButton.setBackgroundResource(R.drawable.rec);
@@ -502,7 +576,7 @@ public class Recording extends AppCompatActivity{
         if (mode==TIMELAPSE_MODE){
             // Note : The time we store in GPX file is with respect to the final video
             // So in the case of a timelapse video at 2 FPS and PLAYBACK_FRAME_RATE = 16, 8 seconds of travel time would
-            // be 1 second in final video. So we normalize the actual time to accomodate this
+            // be 1 second in final video. So we normalize the actual time to accomodate this before saving to GPX file
             return (currentRecordingStartTime + (current_time-currentRecordingStartTime)/(PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS));
         }
 
@@ -542,6 +616,7 @@ public class Recording extends AppCompatActivity{
                 mode = TIMELAPSE_MODE;
                 updateLocationFreq(FREQUENCY);
                 Log.d("Mode","TIMELAPSE_MODE");
+                Log.d("TimeLapse Factor",Long.toString(PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS));
                 break;
         }
     }
@@ -551,23 +626,20 @@ public class Recording extends AppCompatActivity{
 
     //Initialization functions
 
-    private void initialize_camera(){
+    private void initialize_camera(int cameraId){
         // Create an instance of Camera
-        mCamera = getCameraInstance();
+        mCamera = getCameraInstance(cameraId);
 
         //Setting orientation of camera
-        int result = getCameraDisplayOrientation(this, cameraId);
-        mCamera.setDisplayOrientation(result);
+        currentCameraOrientationResult = getCameraDisplayOrientation(this, cameraId);
+        mCamera.setDisplayOrientation(currentCameraOrientationResult);
 
         // Create our Preview view and set it as the content of our activity.
         ConstraintLayout preview = (ConstraintLayout) findViewById(R.id.camera_preview);
         mPreview = new CameraPreview(this, mCamera);
         preview.addView(mPreview);
 
-        //Finding back-camera id
-        cameraId = getBackCameraID();
         Log.d("Camera","Initialized");
-
     }
 
 
@@ -663,20 +735,23 @@ public class Recording extends AppCompatActivity{
     // https://developer.android.com/guide/topics/media/camera#configuring-mediarecorder
     private boolean prepareVideoRecorder(){
 
-        mCamera = getCameraInstance();
-
-        //Getting and setting orientation
-        int result = getCameraDisplayOrientation(this, cameraId);
-
-        Log.d("Cam",Integer.toString(result));
-        mCamera.setDisplayOrientation(result);
-
-
         mediaRecorder = new MediaRecorder();
         // Step 1: Unlock and set camera to MediaRecorder
         mCamera.unlock();
         mediaRecorder.setCamera(mCamera);
-        mediaRecorder.setOrientationHint(result);
+
+        mediaRecorder.setOrientationHint(currentCameraOrientationResult);
+
+        // Todo : Possible bug because hardcoded 90 in CameraPreview
+        // When front camera and vertical, video recorded is upside down when orientation is 90
+        // So we manually change it to 270 for that case
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        Camera.getCameraInfo(currentCameraId, info);
+        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT && currentCameraOrientationResult==90){
+            Log.d("Cam", "Front camera corner case triggered");
+            mediaRecorder.setOrientationHint(270);
+        }
+
 
         // Step 2: Set sources and camcoder profile based on mode
 
@@ -758,7 +833,7 @@ public class Recording extends AppCompatActivity{
             Camera.CameraInfo info = new Camera.CameraInfo();
             Camera.getCameraInfo(i, info);
             if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
-                Log.d("Cam", "Camera found");
+                Log.d("Cam", "Back Camera found");
                 cameraId = i;
                 break;
             }
@@ -766,11 +841,36 @@ public class Recording extends AppCompatActivity{
         return cameraId;
     }
 
-    public static Camera getCameraInstance(){
+    private int getFrontCameraID(){
+        int cameraId = -1;
+        int numberOfCameras = Camera.getNumberOfCameras();
+        for (int i = 0; i < numberOfCameras; i++) {
+            Camera.CameraInfo info = new Camera.CameraInfo();
+            Camera.getCameraInfo(i, info);
+            if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+                Log.d("Cam", "Front Camera found");
+                cameraId = i;
+                break;
+            }
+        }
+        return cameraId;
+    }
+
+    public static Camera getCameraInstance(int cameraId){
         Camera c = null;
         try {
-            c = Camera.open(); // attempt to get a Camera instance
-            c.getParameters().setRecordingHint(true);
+            c = Camera.open(cameraId); // attempt to get a Camera instance
+            Camera.Parameters params = c.getParameters();
+            params.setRecordingHint(true);
+
+            /// Continuous focus is only  available for back camera
+            Camera.CameraInfo info = new Camera.CameraInfo();
+            Camera.getCameraInfo(cameraId, info);
+            if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK){
+                params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+            }
+
+            c.setParameters(params);
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
@@ -831,6 +931,30 @@ public class Recording extends AppCompatActivity{
     }
 
 
+    // Utilty function to lock orientation
+    // Ref ; https://stackoverflow.com/a/14565436/12306553
+    public static void lockOrientation(Activity activity) {
+        Display display = ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+        int rotation = display.getRotation();
+        int tempOrientation = activity.getResources().getConfiguration().orientation;
+        int orientation = 0;
+        switch(tempOrientation)
+        {
+            case Configuration.ORIENTATION_LANDSCAPE:
+                if(rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_90)
+                    orientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                else
+                    orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+                break;
+            case Configuration.ORIENTATION_PORTRAIT:
+                if(rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_270)
+                    orientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                else
+                    orientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
+        }
+        activity.setRequestedOrientation(orientation);
+    }
+
 
 
 
@@ -884,7 +1008,9 @@ public class Recording extends AppCompatActivity{
         long normalized_time = normalize_time_based_on_mode(time_in_ms);
 
         if (mode == TIMELAPSE_MODE){
-            long preferred_time_gap = (PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS)*500; // Convert to Millisec
+            long preferred_time_gap = (PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS)*1000; // Convert to Millisec
+            Log.d("Timelapse", "Time gap in saving " + Long.toString(preferred_time_gap));
+
             // Time is compared in realtime
             if ( (time_in_ms- prevLocSavedTime) < preferred_time_gap ){
                 return;

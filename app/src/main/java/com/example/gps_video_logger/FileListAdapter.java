@@ -19,6 +19,7 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.ViewHolder> {
@@ -69,10 +70,16 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.ViewHo
         // - get element from your dataset at this position
         // - replace the contents of the view with that element
 
+        // Check if file exists - Sometimes race condition causes file to be dalyed in being created
+        String filePath = Environment.getExternalStorageDirectory()
+                + File.separator + "GPS_Video_Logger" + File.separator + mDataset.get(position) + ".mp4";
+        if(!(new File(filePath)).exists())
+            return;
+
+
         holder.mTextView.setText(mDataset.get(position));
 
-        Bitmap bMap = ThumbnailUtils.createVideoThumbnail(Environment.getExternalStorageDirectory()
-                + File.separator + "GPS_Video_Logger" + File.separator + mDataset.get(position) + ".mp4", MediaStore.Video.Thumbnails.MINI_KIND);
+        Bitmap bMap = ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND);
         holder.mImageView.setImageBitmap(bMap);
 
 

@@ -5,7 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".PlaybackActivity"
-    android:background="@color/colorBackground">
+    android:background="@color/colorBackground"
+    android:keepScreenOn="true">
 
     <FrameLayout
         android:id="@+id/frameLayout"

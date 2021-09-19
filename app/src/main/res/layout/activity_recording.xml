@@ -5,7 +5,8 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:baselineAligned="false">
+    android:baselineAligned="false"
+    android:keepScreenOn="true">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/camera_preview"
@@ -52,6 +53,16 @@
 
 
         <Button
+            android:id="@+id/switch_cam_button"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:layout_margin="7.5dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@drawable/switch_cam"
+            app:layout_constraintEnd_toStartOf="@+id/record_button"
+            app:layout_constraintStart_toEndOf="@+id/files_button" />
+
+        <Button
             android:id="@+id/progressBar"
             android:layout_width="35dp"
             android:layout_height="35dp"
@@ -71,6 +82,18 @@
             android:contentDescription="@string/tick"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@+id/guideline5" />
+
+        <Button
+            android:id="@+id/flash_button"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginRight="8dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/flash"
+            android:contentDescription="@string/tick"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/progressBar" />
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/guideline5"
