@@ -11,7 +11,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.TimeZone;
 
 import android.Manifest;
@@ -21,6 +25,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -57,12 +62,15 @@ public class Recording extends AppCompatActivity{
 
     //Video Mode
     private int VIDEO_FPS = 25;
-    private int VIDEO_QUALITY = CamcorderProfile.QUALITY_480P;
+    private int VIDEO_QUALITY;
+    private HashMap<String, Integer> availableVideoQualities;
+
 
     //Timelapse values - Populated based on Camcorder advertised hardware capabilites
     private long TIME_LAPSE_FPS;
     private int PLAYBACK_FRAME_RATE; // Number of FPS when video is played
-    private int TIME_LAPSE_QUALITY = CamcorderProfile.QUALITY_TIME_LAPSE_480P;
+    private int TIME_LAPSE_QUALITY;
+    private HashMap<String, Integer> availableTimeLapseQualities;
 
 
 
@@ -123,10 +131,7 @@ public class Recording extends AppCompatActivity{
 
     Button modeButton;
 
-    // Mode Settings Details
-    TextView mode_text;
-    TextView fps_text;
-    TextView loc_interval_text;
+    // Qauality - Only applicable when using back camera
     TextView quality_text;
 
     @Override
@@ -176,13 +181,9 @@ public class Recording extends AppCompatActivity{
         modeButton = findViewById(R.id.mode_button);
         modeButton.setOnClickListener(modeChangeListener);
 
-        // For details on top right corner
-        mode_text = findViewById(R.id.modeText);
-        fps_text = findViewById(R.id.framesText);
+        // Qaulity chooser
         quality_text = findViewById(R.id.qualityText);
-        loc_interval_text = findViewById(R.id.freqText);
-
-        set_mode(VIDEO_MODE);
+        quality_text.setOnClickListener(qualityTextListener);
 
         initialize_app_folder();
         // Default camera is set as back camera
@@ -190,7 +191,14 @@ public class Recording extends AppCompatActivity{
         initialize_camera(currentCameraId);
         initialize_location();
 
+
+        // Get available qualities
+        availableVideoQualities = getAvailableVideoQualities();
+        availableTimeLapseQualities = getAvailableTimeLapseQualities();
+
+        set_mode(VIDEO_MODE);
     }
+
 
     @Override
     protected void onPause() {
@@ -404,15 +412,57 @@ public class Recording extends AppCompatActivity{
                 //swap the id of the camera to be used
                 if(currentCameraId == Camera.CameraInfo.CAMERA_FACING_BACK){
                     currentCameraId = getFrontCameraID();
+                    // Show quality option
+                    quality_text.setVisibility(View.INVISIBLE);
                 }
                 else {
                     currentCameraId = getBackCameraID();
+                    // Hide quality option
+                    quality_text.setVisibility(View.VISIBLE);
                 }
 
 
                 // Reinitialize with changed cameraId
                 initialize_camera(currentCameraId);
             }
+        }
+    };
+
+    private final View.OnClickListener qualityTextListener = new View.OnClickListener() {
+        // Show popup to select quality
+        // Currently only supported for Back camera
+        @Override
+        public void onClick(View v) {
+            if(isRecording){
+                return;
+            }
+
+            final ArrayList<String> available = new ArrayList<>();
+
+            if (mode==VIDEO_MODE){
+                for (HashMap.Entry<String, Integer> entry : availableVideoQualities.entrySet()){
+                    available.add(entry.getKey());
+                }
+            }
+            else if (mode == TIMELAPSE_MODE){
+                for (HashMap.Entry<String, Integer> entry : availableTimeLapseQualities.entrySet()){
+                    available.add(entry.getKey());
+                }
+            }
+
+
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(Recording.this,R.style.DialogTheme);
+            builder.setTitle("Select quality");
+            builder.setItems(available.toArray(new String[0]), new DialogInterface.OnClickListener() {
+
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String selected_quality = available.get(which);
+                    updatePreferredQuality(selected_quality);
+                }
+            });
+            builder.show();
         }
     };
 
@@ -490,7 +540,6 @@ public class Recording extends AppCompatActivity{
             if (location == null) return;
             mLastLocation = location;
             mLastLocationMillis = SystemClock.elapsedRealtime();
-            Log.d("GPS","Loc changed");
             if (isRecording && (hasGPSFix || forceRec)){
                 if (!gotFirstFix){
                     // When the recording was forced by user, the first location after fix is obtained is
@@ -560,15 +609,6 @@ public class Recording extends AppCompatActivity{
             }
         }
     };
-    
-    
-//    // Updates displayed values to values currently set
-//    private void update_UI(){
-//        mode_text.setText("Video Mode");
-//        fps_text.setText(Integer.toString(VIDEO_FPS));
-//        quality_text.setText(Integer.toString(VIDEO_QUALITY));
-//        loc_interval_text.setText(Long.toString(LOCATION_INTERVAL));
-//    }
 
 
     // Utilty function that normalizes time based on mode (video/time lapse)
@@ -590,8 +630,9 @@ public class Recording extends AppCompatActivity{
     private void set_mode(int new_mode){
         switch (new_mode){
             case VIDEO_MODE:
-                modeButton.setBackgroundResource(R.drawable.video_mode);
                 mode = VIDEO_MODE;
+                modeButton.setBackgroundResource(R.drawable.video_mode);
+                setPreferredQuality();
                 updateLocationFreq(FREQUENCY);
                 Log.d("Mode","VIDEO_MODE");
                 break;
@@ -601,19 +642,13 @@ public class Recording extends AppCompatActivity{
                 // final footage which would translate to getting 1 location point in 16 seconds when the
                 // actual recording is happening
 
+                mode = TIMELAPSE_MODE;
                 // These values depend on camcorder profile
-                CamcorderProfile profile;
-                if(CamcorderProfile.hasProfile(TIME_LAPSE_QUALITY)){
-                    //Checking if the profile is available
-                    profile =  CamcorderProfile.get(TIME_LAPSE_QUALITY);
-                }
-                else{
-                    profile = CamcorderProfile.get(CamcorderProfile.QUALITY_TIME_LAPSE_LOW);
-                }
+                CamcorderProfile profile = getTimeLapseCamcorderProfile();
                 TIME_LAPSE_FPS = (long)(profile.videoFrameRate/6.0);
                 PLAYBACK_FRAME_RATE = profile.videoFrameRate;
                 modeButton.setBackgroundResource(R.drawable.timelapse_mode);
-                mode = TIMELAPSE_MODE;
+                setPreferredQuality();
                 updateLocationFreq(FREQUENCY);
                 Log.d("Mode","TIMELAPSE_MODE");
                 Log.d("TimeLapse Factor",Long.toString(PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS));
@@ -758,33 +793,31 @@ public class Recording extends AppCompatActivity{
         if(mode == VIDEO_MODE){
             mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
             mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-            CamcorderProfile profile;
-            if(CamcorderProfile.hasProfile(VIDEO_QUALITY)){
-                //Checking if the profile is available
-                profile =  CamcorderProfile.get(VIDEO_QUALITY);
-            }
-            else{
-                profile = CamcorderProfile.get(CamcorderProfile.QUALITY_LOW);
-            }
-
+            CamcorderProfile profile = getVideoCamcorderProfile();
             profile.fileFormat = VIDEO_FORMAT;
             mediaRecorder.setProfile(profile);
         }
 
 
         if (mode==TIMELAPSE_MODE){
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
             mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
 
-            CamcorderProfile profile;
-            if(CamcorderProfile.hasProfile(TIME_LAPSE_QUALITY)){
-                //Checking if the profile is available
-                profile =  CamcorderProfile.get(TIME_LAPSE_QUALITY);
-            }
-            else{
-                profile = CamcorderProfile.get(CamcorderProfile.QUALITY_TIME_LAPSE_LOW);
-            }
+            CamcorderProfile profile = getTimeLapseCamcorderProfile();
             profile.fileFormat = VIDEO_FORMAT;
             mediaRecorder.setProfile(profile);
+
+            // When setting Time lapse profile, for certain qualities setAudioEncoder has to be called separately
+            // otherwise exception occurs. At the same time for the other qualities setProfile sets audio encoder and calling
+            // setAudioEncoder again causes exception. This try catch block is to handle this unique case.
+            try {
+                mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+            }
+            catch (Exception e){
+                // This exception is raised for most qualities, in which setProfile sets audio encoder
+                Log.d("MediaRecorder", "SetAudioEncoder Exception: audio encoder has already been set ");
+            }
+
 
             Log.d("Timelapse", Integer.toString(profile.videoBitRate));
             Log.d("Timelapse", Integer.toString(profile.videoFrameRate));
@@ -955,6 +988,123 @@ public class Recording extends AppCompatActivity{
         activity.setRequestedOrientation(orientation);
     }
 
+    // Utility function which returns appropriate TimeLapse Profile
+    private CamcorderProfile getTimeLapseCamcorderProfile(){
+        CamcorderProfile profile;
+        //Checking if the profile is available
+        if(CamcorderProfile.hasProfile(TIME_LAPSE_QUALITY) && currentCameraId == getBackCameraID()){
+            // Front camera doesn't support all available qualities
+            profile =  CamcorderProfile.get(TIME_LAPSE_QUALITY);
+        }
+        else{
+            profile = CamcorderProfile.get(currentCameraId, CamcorderProfile.QUALITY_TIME_LAPSE_HIGH);
+            Log.d("Cam", "High Quality Time Lapse selected");
+        }
+        return profile;
+    }
+
+    // Utility function which returns appropriate Video Profile
+    private CamcorderProfile getVideoCamcorderProfile(){
+        CamcorderProfile profile;
+        //Checking if the profile is available
+        if(CamcorderProfile.hasProfile(VIDEO_QUALITY) && currentCameraId == getBackCameraID()){
+            // Front camera doesn't support all available qualities
+            profile =  CamcorderProfile.get(VIDEO_QUALITY);
+        }
+        else{
+            profile = CamcorderProfile.get(currentCameraId, CamcorderProfile.QUALITY_HIGH);
+            Log.d("Cam", "High Quality Video selected");
+        }
+        return profile;
+    }
+
+
+
+    // Utiltiy functions to set, change quality
+
+    // Set quality based on mode
+    private void setPreferredQuality(){
+        // Loads prefered quality from shared preference if present based on current mode
+        // Else selects first one from available
+
+        SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+
+        if(mode  == VIDEO_MODE){
+            String pref_quality = sharedPref.getString("Quality_Video", (String) availableVideoQualities.keySet().toArray()[0]);
+            VIDEO_QUALITY = availableVideoQualities.get(pref_quality);
+            quality_text.setText(pref_quality);
+        }
+        else if (mode == TIMELAPSE_MODE){
+            String pref_quality = sharedPref.getString("Quality_TimeLapse", (String) availableTimeLapseQualities.keySet().toArray()[0]);
+            TIME_LAPSE_QUALITY = availableTimeLapseQualities.get(pref_quality);
+            quality_text.setText(pref_quality);
+        }
+    }
+
+    // Updates quality corresponding to current mode to given value
+    private void updatePreferredQuality(String pref_quality){
+
+        SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+
+        if (mode == VIDEO_MODE){
+            // Save settings to shared preference
+            editor.putString("Quality_Video", pref_quality);
+            editor.apply();
+            // Change setting and update UI
+            VIDEO_QUALITY = availableVideoQualities.get(pref_quality);
+            quality_text.setText(pref_quality);
+        }
+        else if (mode ==TIMELAPSE_MODE){
+            // Save settings to shared preference
+            editor.putString("Quality_TimeLapse", pref_quality);
+            editor.apply();
+            // Change setting and update UI
+            TIME_LAPSE_QUALITY = availableTimeLapseQualities.get(pref_quality);
+            quality_text.setText(pref_quality);
+        }
+    }
+
+    @NonNull
+    private HashMap<String, Integer> getAvailableVideoQualities() {
+        // Iterate over all camcorder profiles and returns map of supported profiles
+        HashMap<String, Integer> camcorderVideoProfiles = new HashMap<>();
+        camcorderVideoProfiles.put("144p", CamcorderProfile.QUALITY_QCIF);
+        camcorderVideoProfiles.put("240p", CamcorderProfile.QUALITY_QVGA);
+        camcorderVideoProfiles.put("480p", CamcorderProfile.QUALITY_480P);
+        camcorderVideoProfiles.put("720p", CamcorderProfile.QUALITY_720P);
+        camcorderVideoProfiles.put("1080p", CamcorderProfile.QUALITY_1080P);
+        camcorderVideoProfiles.put("2160p", CamcorderProfile.QUALITY_2160P);
+
+        HashMap<String, Integer> resultMap = new HashMap<>();
+
+        for (HashMap.Entry<String, Integer> entry : camcorderVideoProfiles.entrySet()){
+            if(CamcorderProfile.hasProfile(entry.getValue()))
+                resultMap.put(entry.getKey(), entry.getValue());
+        }
+        return resultMap;
+    }
+
+    @NonNull
+    private HashMap<String, Integer> getAvailableTimeLapseQualities() {
+        // Iterate over all camcorder profiles and returns map of supported profiles
+        HashMap<String, Integer> camcorderTimeLapseProfiles = new HashMap<>();
+        camcorderTimeLapseProfiles.put("144p", CamcorderProfile.QUALITY_TIME_LAPSE_QCIF);
+        camcorderTimeLapseProfiles.put("240p", CamcorderProfile.QUALITY_TIME_LAPSE_QVGA);
+        camcorderTimeLapseProfiles.put("480p", CamcorderProfile.QUALITY_TIME_LAPSE_480P);
+        camcorderTimeLapseProfiles.put("720p", CamcorderProfile.QUALITY_TIME_LAPSE_720P);
+        camcorderTimeLapseProfiles.put("1080p", CamcorderProfile.QUALITY_TIME_LAPSE_1080P);
+        camcorderTimeLapseProfiles.put("2160p", CamcorderProfile.QUALITY_TIME_LAPSE_2160P);
+
+        HashMap<String, Integer> resultMap = new HashMap<>();
+
+        for (HashMap.Entry<String, Integer> entry : camcorderTimeLapseProfiles.entrySet()){
+            if(CamcorderProfile.hasProfile(entry.getValue()))
+                resultMap.put(entry.getKey(), entry.getValue());
+        }
+        return resultMap;
+    }
+
 
 
 
@@ -1009,7 +1159,7 @@ public class Recording extends AppCompatActivity{
 
         if (mode == TIMELAPSE_MODE){
             long preferred_time_gap = (PLAYBACK_FRAME_RATE/TIME_LAPSE_FPS)*1000; // Convert to Millisec
-            Log.d("Timelapse", "Time gap in saving " + Long.toString(preferred_time_gap));
+//            Log.d("Timelapse", "Time gap in saving " + Long.toString(preferred_time_gap));
 
             // Time is compared in realtime
             if ( (time_in_ms- prevLocSavedTime) < preferred_time_gap ){
