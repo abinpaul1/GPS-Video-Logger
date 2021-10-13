@@ -1,4 +1,4 @@
-package com.example.gps_video_logger;
+package app.gps_video_logger;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;

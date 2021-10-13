@@ -1,4 +1,4 @@
-package com.example.gps_video_logger;
+package app.gps_video_logger;
 
 
 import androidx.annotation.NonNull;
@@ -12,10 +12,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.TimeZone;
 
 import android.Manifest;
@@ -39,7 +37,6 @@ import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;

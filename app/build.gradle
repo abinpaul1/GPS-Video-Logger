@@ -4,7 +4,7 @@ android {
     compileSdkVersion 31
     buildToolsVersion "29.0.2"
     defaultConfig {
-        applicationId "com.example.gps_app"
+        applicationId "app.gps_video_logger"
         minSdkVersion 16
         targetSdkVersion 31
         versionCode 7
@@ -13,7 +13,7 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

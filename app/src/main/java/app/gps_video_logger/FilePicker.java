@@ -1,4 +1,4 @@
-package com.example.gps_video_logger;
+package app.gps_video_logger;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -9,8 +9,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
-import android.os.Environment;
 
 import java.io.File;
 import java.util.ArrayList;

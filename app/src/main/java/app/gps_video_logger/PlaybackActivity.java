@@ -1,7 +1,6 @@
-package com.example.gps_video_logger;
+package app.gps_video_logger;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -11,7 +10,6 @@ import android.graphics.PorterDuff;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.util.Log;
