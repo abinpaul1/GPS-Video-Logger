@@ -136,7 +136,7 @@ public class PlaybackActivity extends AppCompatActivity {
 
 
         //Location of Video File
-        Uri uri = Uri.parse(Environment.getExternalStorageDirectory() +
+        Uri uri = Uri.parse(getExternalFilesDir(null) +
                 File.separator + "GPS_Video_Logger" + File.separator + filename +".mp4");
         mVideoView.setVideoURI(uri);
         mVideoView.requestFocus();
@@ -260,11 +260,11 @@ public class PlaybackActivity extends AppCompatActivity {
 
         String gpx_filename = filename + ".gpx";
 
-        Log.d("Fileo",Environment.getExternalStorageDirectory() +
+        Log.d("Fileo",getExternalFilesDir(null) +
                 File.separator + "GPS_Video_Logger" + "/" + gpx_filename);
 
         try {
-            fis = new FileInputStream(new File( Environment.getExternalStorageDirectory() +
+            fis = new FileInputStream(new File( getExternalFilesDir(null) +
                     File.separator + "GPS_Video_Logger", gpx_filename));
             gpx_parsed = parser.parse(fis);
         } catch (IOException | XmlPullParserException e) {
@@ -524,7 +524,7 @@ public class PlaybackActivity extends AppCompatActivity {
         else if (msg_code == GPX_FILE_NOT_FOUND)
             err_msg = "GPX file not Found! If you copied a new file into the app folder, ensure the video file and GPX file have the same name.";
         else if (msg_code == EMPTY_GPX_FILE)
-            err_msg = "The GPX file does not have track data. This could happen if you recorded a very short video or GPS fix was lost after commencing recording. You can still access the video file in the app folder.";
+            err_msg = "The GPX file does not have track data. This could happen if you recorded a very short video or GPS fix was lost after commencing recording. You can still access the video file in the app folder in Android/data.";
 
         // No corresponding GPX file. Ensure same name, Show alert before quit
         // Setting Dialog Title

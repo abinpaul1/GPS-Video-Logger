@@ -41,7 +41,7 @@ public class FilePicker extends AppCompatActivity {
         filenames = FetchFileList();
 
         // specify an adapter (see also next example)
-        mAdapter = new FileListAdapter(filenames);
+        mAdapter = new FileListAdapter(filenames, this);
         recyclerView.setAdapter(mAdapter);
 
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(simpleItemTouchCallback);
@@ -101,7 +101,7 @@ public class FilePicker extends AppCompatActivity {
 
     private void remove_file(int position){
         String remove_file = filenames.get(position);
-        String path = Environment.getExternalStorageDirectory()
+        String path = getExternalFilesDir(null)
                 + File.separator + "GPS_Video_Logger" + File.separator;
 
         File mp4_file = new File(path + remove_file + ".mp4");
@@ -121,7 +121,7 @@ public class FilePicker extends AppCompatActivity {
     private ArrayList<String> FetchFileList() {
 
         ArrayList<String> filenames = new ArrayList<String>();
-        String path = Environment.getExternalStorageDirectory()
+        String path = getExternalFilesDir(null)
                 + File.separator + "GPS_Video_Logger";
 
         File directory = new File(path);

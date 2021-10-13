@@ -30,12 +30,14 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.hardware.Camera;
+import android.location.GnssStatus;
 import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.SystemClock;
@@ -610,6 +612,52 @@ public class Recording extends AppCompatActivity{
         }
     };
 
+    // GnssStatus Listener
+    private final GnssStatus.Callback mGnssStatusCallback = new GnssStatus.Callback() {
+        @Override
+        public void onStarted() {
+            super.onStarted();
+            Log.i("GPS", "Started!");
+        }
+
+        @Override
+        public void onStopped() {
+            super.onStopped();
+            Log.i("GPS", "Stopped");
+        }
+
+        @Override
+        public void onFirstFix(int ttffMillis) {
+            super.onFirstFix(ttffMillis);
+            Log.i("GPS", "First Fix/ Refix");
+            setGPSFix(true);
+        }
+
+        @SuppressLint("MissingPermission")
+        @Override
+        public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
+            super.onSatelliteStatusChanged(status);
+            if (mLastLocation != null)
+            {
+                if((SystemClock.elapsedRealtime() - mLastLocationMillis) < 5000)
+                {
+                    if (!hasGPSFix)
+                        Log.i("GPS","Fix Acquired");
+                    setGPSFix(true);
+                }
+                else
+                {
+                    if (hasGPSFix)
+                    {
+                        Log.i("GPS","Fix Lost (expired)");
+                        mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
+                    }
+                    setGPSFix(false);
+                }
+            }
+        }
+    };
+
 
     // Utilty function that normalizes time based on mode (video/time lapse)
     private long normalize_time_based_on_mode(long current_time){
@@ -681,7 +729,7 @@ public class Recording extends AppCompatActivity{
 
     private void initialize_app_folder(){
         //Check for app folder
-        File folder = new File(Environment.getExternalStorageDirectory() +
+        File folder = new File(getExternalFilesDir(null) +
                 File.separator + "GPS_Video_Logger");
         if (!folder.exists()) {
             //Handle error in making folder
@@ -710,12 +758,29 @@ public class Recording extends AppCompatActivity{
 
             if (!state && !isRecording && isGPSLocationUpdatesActive) {
                 Log.d("GPS", "Stopping");
-                mlocManager.removeGpsStatusListener(mGpsStatusListener);
+
+                // From Android 12 GPSStatusListener does not work
+                // GNSSStatusCallback was added only in API 24
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+
+                }
+                else{
+                    mlocManager.removeGpsStatusListener(mGpsStatusListener);
+                }
+
                 mlocManager.removeUpdates(mlocListener);
                 isGPSLocationUpdatesActive = false;
             } else if (state && !isGPSLocationUpdatesActive) {
 
-                mlocManager.addGpsStatusListener(mGpsStatusListener);
+                // From Android 12 GPSStatusListener does not work
+                // GNSSStatusCallback was added only in API 24
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+
+                }
+                else{
+                    mlocManager.addGpsStatusListener(mGpsStatusListener);
+                }
+
                 mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, FREQUENCY, 0, mlocListener);
                 isGPSLocationUpdatesActive = true;
                 Log.d("GPS", "Started");
@@ -729,11 +794,24 @@ public class Recording extends AppCompatActivity{
         if (isGPSLocationUpdatesActive
                 && (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED))
         {
-            //Log.w("myApp", "[#] GPSApplication.java - updateGPSLocationFrequency");
-            mlocManager.removeGpsStatusListener(mGpsStatusListener);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+                    mlocManager.registerGnssStatusCallback(this.getMainExecutor(),mGnssStatusCallback);
+            }
+            else{
+                mlocManager.removeGpsStatusListener(mGpsStatusListener);
+            }
+
             mlocManager.removeUpdates(mlocListener);
 
-            mlocManager.addGpsStatusListener(mGpsStatusListener);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+
+            }
+            else{
+                mlocManager.addGpsStatusListener(mGpsStatusListener);
+            }
+
             mlocManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, frequency, 0, mlocListener);
         }
     }
@@ -831,7 +909,7 @@ public class Recording extends AppCompatActivity{
 
 
         // Step 4: Set output file
-        mediaRecorder.setOutputFile(Environment.getExternalStorageDirectory() +
+        mediaRecorder.setOutputFile(getExternalFilesDir(null) +
                 File.separator + "GPS_Video_Logger" + File.separator + filename +".mp4");
 
         // Step 5: Set the preview output
@@ -1115,7 +1193,7 @@ public class Recording extends AppCompatActivity{
     private void  create_gpx_file(String filename){
         Log.d("oss","Creating file");
         try {
-            fos = new FileOutputStream(new File( Environment.getExternalStorageDirectory() +
+            fos = new FileOutputStream(new File( getExternalFilesDir(null) +
                     File.separator + "GPS_Video_Logger", filename));
             Log.d("oss","Opened file");
         } catch (FileNotFoundException e) {
@@ -1225,7 +1303,7 @@ public class Recording extends AppCompatActivity{
                 msg = "Video format is mp4" +"\n"+
                         "GPS track is saved in GPX file format" + "\n" +
                         "Both files would have the same name" + "\n" +
-                        "The separate files can be found in the GPS_Video_Logger folder in your Internal Storage" + "\n" +
+                        "The separate files can be found in the app folder at Android/data/" + "\n" +
                         "Swipe to delete video file" + "\n" +
                         "Long press to rename videos" + "\n" +
                         "Video Mode and Time Lapse Mode available";
