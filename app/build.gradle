@@ -7,7 +7,7 @@ android {
         applicationId "app.gps_video_logger"
         minSdkVersion 16
         targetSdkVersion 31
-        versionCode 7
+        versionCode 8
         versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -25,10 +25,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
     implementation 'com.google.android.material:material:1.4.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test:runner:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
-    implementation 'org.osmdroid:osmdroid-android:6.1.5'
+    implementation 'org.osmdroid:osmdroid-android:6.1.10'
     implementation 'de.hdodenhof:circleimageview:3.1.0'
     implementation "androidx.cardview:cardview:1.0.0"
     api 'io.ticofab.androidgpxparser:parser:1.6.0'

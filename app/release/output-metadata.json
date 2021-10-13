@@ -4,14 +4,14 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.example.gps_app",
+  "applicationId": "app.gps_video_logger",
   "variantName": "processReleaseResources",
   "elements": [
     {
       "type": "SINGLE",
       "filters": [],
-      "versionCode": 5,
-      "versionName": "1.2.1",
+      "versionCode": 8,
+      "versionName": "2.0.0",
       "outputFile": "app-release.apk"
     }
   ]
