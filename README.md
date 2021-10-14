@@ -10,7 +10,9 @@ GPS Video Logger is a simple Android App to record video and geographical positi
 GPS logging and video tracking is done in an optimized manner.<br>
 The app offers two modes of recording : Video Mode and Timelapse Mode<br>
 The app provides a video player to view your video and location on map side by side. (Video and GPS player)<br>
-Recorded journeys are stored directly in your Internal Storage (Video as mp4 and track as a GPX file).<br>
+Recorded journeys are stored directly in your Internal Storage at : <br>
+```Android / data / app.gps_video_logger / files / GPS_Video_Logger /```
+(Video as mp4 and track as a GPX file)<br>
 <br>
 The application can be downloaded from this repository.[GPSVideoLogger](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/app/release/app-release.apk)<br>
 It will shortly be made available on Google Play Store.
@@ -22,6 +24,8 @@ It will shortly be made available on Google Play Store.
 
 [Repository License](LICENSE)
 
+[Privacy Policy](https://github.com/abinpaul1/GPS-Video-Logger/wiki/Privacy-Policy)
+
 ## Frequently Asked Questions
 <b>Q</b> - <i>I've just installed the App, but it doesn't read the GPS Signal.</i><br>
 <b>A</b> - Please reboot your Device, go in an open Area and try to repeat your test.
@@ -31,3 +35,8 @@ It will shortly be made available on Google Play Store.
 
 <b>Q</b> - <i>My horizontal videos appear vertical during playback</i><br>
 <b>A</b> - Ensure you have enabled the  "Auto Screen Rotate" feature before starting the recording. 
+
+<b>Q</b> - <i>How to import recorded videos from older version of the app?</i><br>
+<b>A</b> - In earlier versions, the video and track file was located in `GPS_Video_Logger` folder, dirrectly on Internal Storage. Please copy all the files in that folder to the new location ```Android / data / app.gps_video_logger / files / GPS_Video_Logger /``` and the app will detect them and allow playback.
+
+<strong>Feel free to open issues in the repository for any kind of queries or suggestion</strong>
