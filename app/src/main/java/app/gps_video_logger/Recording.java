@@ -758,8 +758,8 @@ public class Recording extends AppCompatActivity{
 
                 // From Android 12 GPSStatusListener does not work
                 // GNSSStatusCallback was added only in API 24
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
-
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+                    mlocManager.unregisterGnssStatusCallback(mGnssStatusCallback);
                 }
                 else{
                     mlocManager.removeGpsStatusListener(mGpsStatusListener);
@@ -771,8 +771,8 @@ public class Recording extends AppCompatActivity{
 
                 // From Android 12 GPSStatusListener does not work
                 // GNSSStatusCallback was added only in API 24
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
-
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+                    mlocManager.registerGnssStatusCallback(this.getMainExecutor(),mGnssStatusCallback);
                 }
                 else{
                     mlocManager.addGpsStatusListener(mGpsStatusListener);
@@ -793,7 +793,7 @@ public class Recording extends AppCompatActivity{
         {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
-                    mlocManager.registerGnssStatusCallback(this.getMainExecutor(),mGnssStatusCallback);
+                    mlocManager.unregisterGnssStatusCallback(mGnssStatusCallback);
             }
             else{
                 mlocManager.removeGpsStatusListener(mGpsStatusListener);
@@ -802,8 +802,8 @@ public class Recording extends AppCompatActivity{
             mlocManager.removeUpdates(mlocListener);
 
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
-
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+                mlocManager.registerGnssStatusCallback(this.getMainExecutor(),mGnssStatusCallback);
             }
             else{
                 mlocManager.addGpsStatusListener(mGpsStatusListener);
