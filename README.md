@@ -1,5 +1,7 @@
 # GPS-Video-Logger<br>
 <a href="https://play.google.com/store/apps/details?id=app.gps_video_logger"><img src="https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png" height="75"></a>
+<a href="https://apt.izzysoft.de/fdroid/index/apk/app.gps_video_logger"><img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="75"></a>
+
 
 [![Releases](http://img.shields.io/github/release/abinpaul1/GPS-Video-Logger.svg?label=%20release%20&color=green)](https://github.com/abinpaul1/GPS-Video-Logger/releases) [![GitHub license](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/abinpaul1/GPS-Video-Logger/blob/master/LICENSE)<br>
 Record and playback video and live location data simultaneously.
